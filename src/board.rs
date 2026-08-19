@@ -200,4 +200,33 @@ impl HexBoard {
 
         EMPTY
     }
+
+    /// Usage:
+    ///     let game_over = board.is_game_over();
+    /// Usage Example:
+    ///     if board.is_game_over() { ... }
+    /// Description:
+    ///     Returns true if either Red or Blue has won or no legal moves remain.
+    #[inline(always)]
+    pub fn is_game_over(&self) -> bool {
+        self.get_winner() != EMPTY || (self.red_bb.count_ones() + self.blue_bb.count_ones()) as usize >= self.size * self.size
+    }
+
+    /// Usage:
+    ///     let moves = board.get_legal_moves();
+    /// Usage Example:
+    ///     let legal = board.get_legal_moves();
+    /// Description:
+    ///     Returns list of all unoccupied coordinates (r, c).
+    pub fn get_legal_moves(&self) -> Vec<(usize, usize)> {
+        let mut moves = Vec::with_capacity(self.size * self.size);
+        for r in 0..self.size {
+            for c in 0..self.size {
+                if self.get_cell(r, c) == EMPTY {
+                    moves.push((r, c));
+                }
+            }
+        }
+        moves
+    }
 }

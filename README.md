@@ -71,6 +71,25 @@ This script automatically builds the Rust SIMD Bitboard core in release mode, co
 
 ---
 
+## Automated Head-to-Head Tournament Arena (`arena`)
+
+Pit the **Hex Nash Engine** against the **Nintendo Impossible Computer (NIC) Replica** in automated, headless multi-game tournaments across diverse openings:
+
+```bash
+# Run a 20-game tournament at depth 6
+cargo run --release --bin arena -- --games 20 --depth 6
+
+# Run with verbose move-by-move logs
+cargo run --release --bin arena -- --games 4 --depth 6 --verbose
+```
+
+Features:
+- **Pairwise Alternating Colors**: Automates alternating matches (Nash as Blue vs NIC as Red, then NIC as Blue vs Nash as Red).
+- **Opening Diversity**: Tests center, off-center, flank, and diagonal lines (`F6`, `E5`, `C9`, `D4`, `H5`, `G7`, etc.).
+- **Automatic Divergence & Blunder Logging**: Outputs full PGN records and tactical divergence points for any lost games.
+
+---
+
 ## Headless CLI Solvers
 
 - **Native C++ CLI**:

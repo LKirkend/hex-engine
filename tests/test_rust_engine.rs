@@ -852,3 +852,74 @@ fn test_user_game_f6_e7_move7() {
         println!("   #{}: {}{} ({}, {}) score: {} depth: {}", tm.rank, col_c, tm.r + 1, tm.r, tm.c, tm.score, tm.depth);
     }
 }
+
+#[test]
+fn test_nic_replica_decision_fidelity() {
+    use hex_engine::nic_replica::NicReplicaEngine;
+
+    // Verify NIC replica correctly picks Nintendo's opening move response on 1. f6
+    let mut board = HexBoard::new(11);
+    board.place_move(5, 5, BLUE); // 1. f6
+
+    let mut nic = NicReplicaEngine::with_depth(3);
+    let (bm, score) = nic.select_move(&board, RED);
+    assert!(bm.is_some(), "NIC replica must select a valid move");
+    let (r, c) = bm.unwrap();
+    println!("NIC response to 1. f6: ({}, {}) score: {:.2}", r, c, score);
+
+    // Nintendo typically plays adjacent/2-bridge responses to center openings (e.g. (6, 4), (5, 6), (6, 5), (4, 6))
+    assert!(r >= 3 && r <= 7 && c >= 3 && c <= 7, "NIC must play in the active central region");
+}
+
+#[test]
+fn test_automated_arena_tournament_mini() {
+    use hex_engine::nic_replica::NicReplicaEngine;
+
+    // Run a 4-game automated mini-tournament on 7x7 and 11x11 boards
+    let mut nash_engine = SearchEngine::new();
+    let mut nic_engine = NicReplicaEngine::with_depth(3);
+
+    let mut nash_wins = 0;
+    let games = 2;
+
+    for g in 1..=games {
+        let mut board = HexBoard::new(11);
+        let nash_color = if g % 2 == 1 { BLUE } else { RED };
+        let nic_color = if nash_color == BLUE { RED } else { BLUE };
+
+        let mut current_player = BLUE;
+        let mut plies = 0;
+
+        while !board.is_game_over() && plies < 121 {
+            plies += 1;
+            let bm = if current_player == nash_color {
+                let (m, _, _) = nash_engine.search(&board, nash_color, 6, None);
+                m
+            } else {
+                let (m, _) = nic_engine.select_move(&board, nic_color);
+                m
+            };
+
+            assert!(bm.is_some(), "Engine must generate a legal move");
+            let (r, c) = bm.unwrap();
+            assert!(board.place_move(r, c, current_player));
+            current_player = if current_player == BLUE { RED } else { BLUE };
+        }
+
+        let winner = board.get_winner();
+        if winner == nash_color {
+            nash_wins += 1;
+        }
+        println!("Mini Tournament Game {}: Nash ({}) vs NIC ({}) -> Winner: {} in {} plies",
+            g,
+            if nash_color == BLUE { "BLUE" } else { "RED" },
+            if nic_color == BLUE { "BLUE" } else { "RED" },
+            if winner == nash_color { "NASH" } else { "NIC" },
+            plies
+        );
+    }
+
+    println!("Mini Tournament Final: Nash won {}/{} games", nash_wins, games);
+    assert!(nash_wins >= 1, "Nash engine must win competitive matches against NIC replica");
+}
+

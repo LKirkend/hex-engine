@@ -70,7 +70,7 @@ impl ResistanceEvaluator {
     ///     Uses Gauss-Seidel iterative relaxation to solve the Kirchhoff equations.
     ///     Own stones = superconductor (0 resistance), empty = unit resistor, opponent = insulator.
     ///     2-bridges and precomputed edge templates provide direct high-conductance virtual links.
-    fn compute_player_resistance(board: &HexBoard, player: u8) -> f32 {
+    pub fn compute_player_resistance(board: &HexBoard, player: u8) -> f32 {
         let size = board.size;
         let opponent = if player == RED { BLUE } else { RED };
 

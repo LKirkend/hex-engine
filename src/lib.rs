@@ -8,6 +8,7 @@
 pub mod bitboard;
 pub mod board;
 pub mod evaluator;
+pub mod nic_replica;
 pub mod openings;
 pub mod patterns;
 pub mod resistance;
@@ -605,5 +606,78 @@ pub extern "C" fn hex_engine_get_initial_candidates(
     }
 
     1
+}
+
+/// Usage:
+///     let nic = nic_engine_create(3);
+/// Usage Example:
+///     let nic = nic_engine_create(3);
+/// Description:
+///     Creates and heap-allocates a new NicReplicaEngine instance.
+#[no_mangle]
+pub extern "C" fn nic_engine_create(depth: i32) -> *mut nic_replica::NicReplicaEngine {
+    Box::into_raw(Box::new(nic_replica::NicReplicaEngine::with_depth(depth.max(1) as usize)))
+}
+
+/// Usage:
+///     nic_engine_destroy(nic_ptr);
+/// Usage Example:
+///     nic_engine_destroy(nic);
+/// Description:
+///     Frees a heap-allocated NicReplicaEngine instance.
+#[no_mangle]
+pub extern "C" fn nic_engine_destroy(nic: *mut nic_replica::NicReplicaEngine) {
+    if !nic.is_null() {
+        unsafe {
+            drop(Box::from_raw(nic));
+        }
+    }
+}
+
+/// Usage:
+///     let success = nic_engine_select_move(nic, board_flat, 11, BLUE, &mut out_r, &mut out_c, &mut out_score);
+/// Usage Example:
+///     let res = nic_engine_select_move(nic, board_ptr, 11, 2, &mut r, &mut c, &mut score);
+/// Description:
+///     Executes move selection using the NIC replica engine algorithm.
+#[no_mangle]
+pub extern "C" fn nic_engine_select_move(
+    nic_ptr: *mut nic_replica::NicReplicaEngine,
+    board_flat: *const u8,
+    size: i32,
+    player: i32,
+    out_r: *mut i32,
+    out_c: *mut i32,
+    out_score: *mut f32,
+) -> i32 {
+    if nic_ptr.is_null() || board_flat.is_null() || size <= 0 || size > 14 || out_r.is_null() || out_c.is_null() || out_score.is_null() {
+        return 0;
+    }
+
+    let nic = unsafe { &mut *nic_ptr };
+    let s = size as usize;
+    let slice = unsafe { std::slice::from_raw_parts(board_flat, s * s) };
+    let mut board = HexBoard::new(s);
+
+    for r in 0..s {
+        for c in 0..s {
+            let p = slice[r * s + c];
+            if p == RED || p == BLUE {
+                board.place_move(r, c, p);
+            }
+        }
+    }
+
+    let (bm, score) = nic.select_move(&board, player as u8);
+    if let Some((r, c)) = bm {
+        unsafe {
+            *out_r = r as i32;
+            *out_c = c as i32;
+            *out_score = score;
+        }
+        1
+    } else {
+        0
+    }
 }
 
