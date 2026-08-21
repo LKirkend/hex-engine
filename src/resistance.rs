@@ -170,8 +170,9 @@ impl ResistanceEvaluator {
             }
         }
 
-        // Compute total current from source rail (boundary + edge template direct current)
-        let mut total_current = 0.0f32;
+        // Compute total current symmetrically across source and sink rails
+        let mut source_current = 0.0f32;
+        let mut sink_current = 0.0f32;
         for r in 0..size {
             for c in 0..size {
                 let idx = r * size + c;
@@ -179,10 +180,10 @@ impl ResistanceEvaluator {
                 if cell == opponent { continue; }
 
                 let is_source = if player == RED { r == 0 } else { c == 0 };
+                let is_sink = if player == RED { r == size - 1 } else { c == size - 1 };
 
                 if is_source {
                     if cell == player {
-                        // Current from source stone to non-source neighbors
                         for k in 0..6 {
                             let nr = r as isize + DR[k];
                             let nc = c as isize + DC[k];
@@ -193,20 +194,43 @@ impl ResistanceEvaluator {
                                 let g = if n_cell == player { 100.0 } else { 2.0 };
                                 let delta = voltage[idx] - voltage[nidx];
                                 if delta > 0.0 {
-                                    total_current += g * delta;
+                                    source_current += g * delta;
                                 }
                             }
                         }
                     } else {
-                        // Empty source-edge cell: current from source rail
-                        total_current += 1.0 * (1.0 - voltage[idx]);
+                        source_current += 1.0 * (1.0 - voltage[idx]);
                     }
                 } else if source_template_g[idx] > 0.0 {
-                    // Current flowing from source rail through precomputed edge template into inner stone
-                    total_current += source_template_g[idx] * (1.0 - voltage[idx]);
+                    source_current += source_template_g[idx] * (1.0 - voltage[idx]);
+                }
+
+                if is_sink {
+                    if cell == player {
+                        for k in 0..6 {
+                            let nr = r as isize + DR[k];
+                            let nc = c as isize + DC[k];
+                            if nr >= 0 && nr < size as isize && nc >= 0 && nc < size as isize {
+                                let nidx = nr as usize * size + nc as usize;
+                                let n_cell = board.get_cell(nr as usize, nc as usize);
+                                if n_cell == opponent { continue; }
+                                let g = if n_cell == player { 100.0 } else { 2.0 };
+                                let delta = voltage[nidx] - voltage[idx];
+                                if delta > 0.0 {
+                                    sink_current += g * delta;
+                                }
+                            }
+                        }
+                    } else {
+                        sink_current += 1.0 * voltage[idx];
+                    }
+                } else if sink_template_g[idx] > 0.0 {
+                    sink_current += sink_template_g[idx] * voltage[idx];
                 }
             }
         }
+
+        let total_current = (source_current + sink_current) * 0.5;
 
         if total_current > 0.001 {
             1.0 / total_current

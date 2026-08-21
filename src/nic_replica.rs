@@ -151,6 +151,47 @@ impl NicReplicaEngine {
             let delta_g_own = (after_g_own - base_g_own).max(0.0);
             let delta_g_opp = (base_g_opp - after_g_opp).max(0.0);
 
+            // 5. Tactical weights: 2-bridge formation & opponent contact
+            let ur = r as isize;
+            let uc = c as isize;
+            let mut bridge_count = 0;
+            let mut opp_contact_count = 0;
+
+            for k in 0..6 {
+                // Check 2-bridge to friendly stones
+                let (br, bc, c1r, c1c, c2r, c2c) = crate::evaluator::B2_OFFSETS[k];
+                let nr = ur + br;
+                let nc = uc + bc;
+                if nr >= 0 && nr < size as isize && nc >= 0 && nc < size as isize {
+                    if board.get_cell(nr as usize, nc as usize) == player {
+                        let cr1 = ur + c1r;
+                        let cc1 = uc + c1c;
+                        let cr2 = ur + c2r;
+                        let cc2 = uc + c2c;
+                        if cr1 >= 0 && cr1 < size as isize && cc1 >= 0 && cc1 < size as isize
+                            && cr2 >= 0 && cr2 < size as isize && cc2 >= 0 && cc2 < size as isize
+                        {
+                            if board.get_cell(cr1 as usize, cc1 as usize) == crate::board::EMPTY
+                                && board.get_cell(cr2 as usize, cc2 as usize) == crate::board::EMPTY
+                            {
+                                bridge_count += 1;
+                            }
+                        }
+                    }
+                }
+
+                // Check direct adjacency / contact to opponent stones
+                let adj_r = ur + crate::evaluator::DR[k];
+                let adj_c = uc + crate::evaluator::DC[k];
+                if adj_r >= 0 && adj_r < size as isize && adj_c >= 0 && adj_c < size as isize {
+                    if board.get_cell(adj_r as usize, adj_c as usize) == opponent {
+                        opp_contact_count += 1;
+                    }
+                }
+            }
+
+            let tactical_score = bridge_count as f32 * 40.0 + opp_contact_count as f32 * 30.0;
+
             // Center bias (NIC prioritizes central contest, especially in opening/early middle game)
             let center_bias = if size == 11 {
                 crate::evaluator::CENTER_11[r * size + c] * 2.0
@@ -160,9 +201,10 @@ impl NicReplicaEngine {
                 (center - (dr * dr + dc * dc).sqrt()).max(0.0) * 2.0
             };
 
-            // NIC composite score: pure conductance deltas + center tiebreaker
+            // NIC composite score: pure conductance deltas + tactical weights + center tiebreaker
             let total_score = delta_g_own * 100.0
                 + delta_g_opp * 80.0
+                + tactical_score
                 + center_bias;
 
             scored_moves.push(NicMoveScore {

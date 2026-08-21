@@ -13,10 +13,10 @@ use crate::resistance::ResistanceEvaluator;
 
 pub const WIN_SCORE: f32 = 100000.0;
 
-const DR: [isize; 6] = [-1, -1, 0, 0, 1, 1];
-const DC: [isize; 6] = [0, 1, -1, 1, -1, 0];
+pub const DR: [isize; 6] = [-1, -1, 0, 0, 1, 1];
+pub const DC: [isize; 6] = [0, 1, -1, 1, -1, 0];
 
-const B2_OFFSETS: [(isize, isize, isize, isize, isize, isize); 6] = [
+pub const B2_OFFSETS: [(isize, isize, isize, isize, isize, isize); 6] = [
     (-2, 1, -1, 0, -1, 1),
     (-1, -1, -1, 0, 0, -1),
     (-1, 2, -1, 1, 0, 1),
