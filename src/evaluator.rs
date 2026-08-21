@@ -130,6 +130,138 @@ pub struct HexEvaluator;
 
 impl HexEvaluator {
     /// Usage:
+    ///     let (reach_frac, chain_stones) = HexEvaluator::bridge_chain_reach(board, RED);
+    /// Usage Example:
+    ///     let (frac, cnt) = HexEvaluator::bridge_chain_reach(&board, RED);
+    ///     if frac > 0.6 { /* Red has a dangerous bridge chain */ }
+    /// Description:
+    ///     Computes the maximum extent of a player's bridge-connected chain along their
+    ///     connection axis. Uses BFS traversal where two friendly stones connected by a
+    ///     2-bridge (both carrier cells empty) are treated as directly connected.
+    ///     Returns (reach_fraction, chain_stone_count) where reach_fraction is the
+    ///     fraction of the board axis spanned by the longest chain (0.0 to 1.0).
+    pub fn bridge_chain_reach(board: &HexBoard, player: u8) -> (f32, usize) {
+        let size = board.size;
+        if size < 3 { return (0.0, 0); }
+        let opponent = if player == RED { BLUE } else { RED };
+
+        // Collect all stones of this player
+        let bb = if player == RED { &board.red_bb } else { &board.blue_bb };
+        let mut stones: Vec<usize> = Vec::new();
+        let mut bits = bb.0;
+        while bits != 0 {
+            let idx = bits.trailing_zeros() as usize;
+            bits &= bits - 1;
+            stones.push(idx);
+        }
+        if stones.is_empty() { return (0.0, 0); }
+
+        // Build adjacency including 2-bridge virtual links
+        let mut visited = [false; 196];
+        let mut best_min_axis = size;
+        let mut best_max_axis = 0usize;
+        let mut best_chain_size = 0usize;
+
+        for &start_idx in &stones {
+            if visited[start_idx] { continue; }
+
+            // BFS from this stone through direct neighbors and 2-bridges
+            let mut queue = vec![start_idx];
+            let mut component_min = size;
+            let mut component_max = 0usize;
+            let mut component_size = 0usize;
+            visited[start_idx] = true;
+
+            while let Some(cur) = queue.pop() {
+                let cr = cur / size;
+                let cc = cur % size;
+                let axis_val = if player == RED { cr } else { cc };
+                component_min = component_min.min(axis_val);
+                component_max = component_max.max(axis_val);
+                component_size += 1;
+
+                // Direct hex neighbors
+                for k in 0..6 {
+                    let nr = cr as isize + DR[k];
+                    let nc = cc as isize + DC[k];
+                    if nr >= 0 && nr < size as isize && nc >= 0 && nc < size as isize {
+                        let nidx = nr as usize * size + nc as usize;
+                        if !visited[nidx] && board.get_cell(nr as usize, nc as usize) == player {
+                            visited[nidx] = true;
+                            queue.push(nidx);
+                        }
+                    }
+                }
+
+                // 2-bridge virtual connections
+                let ur = cr as isize;
+                let uc = cc as isize;
+                for k in 0..6 {
+                    let (br, bc, c1r, c1c, c2r, c2c) = B2_OFFSETS[k];
+                    let nr = ur + br;
+                    let nc = uc + bc;
+                    if nr >= 0 && nr < size as isize && nc >= 0 && nc < size as isize {
+                        let nidx = nr as usize * size + nc as usize;
+                        if !visited[nidx] && board.get_cell(nr as usize, nc as usize) == player {
+                            // Check both carrier cells are empty
+                            let cr1 = ur + c1r;
+                            let cc1 = uc + c1c;
+                            let cr2 = ur + c2r;
+                            let cc2 = uc + c2c;
+                            if cr1 >= 0 && cr1 < size as isize && cc1 >= 0 && cc1 < size as isize
+                                && cr2 >= 0 && cr2 < size as isize && cc2 >= 0 && cc2 < size as isize
+                            {
+                                let c1 = board.get_cell(cr1 as usize, cc1 as usize);
+                                let c2 = board.get_cell(cr2 as usize, cc2 as usize);
+                                if c1 != opponent && c2 != opponent {
+                                    // At least one carrier must be empty for the bridge to function
+                                    if c1 == EMPTY || c2 == EMPTY {
+                                        visited[nidx] = true;
+                                        queue.push(nidx);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Also count edge connectivity: if component touches source/sink edges via
+            // edge templates, extend the axis range
+            // Source edge: row 0 for Red, col 0 for Blue
+            // Sink edge: row size-1 for Red, col size-1 for Blue
+            if player == RED {
+                if component_min <= 2 {
+                    // Check if any stone in the component connects to north edge via template
+                    // Approximate: if min row is 0-2 and stone has template connection, treat as row 0
+                    component_min = 0;
+                }
+                if component_max >= size - 3 {
+                    component_max = size - 1;
+                }
+            } else {
+                if component_min <= 2 {
+                    component_min = 0;
+                }
+                if component_max >= size - 3 {
+                    component_max = size - 1;
+                }
+            }
+
+            let span = if component_max >= component_min { component_max - component_min } else { 0 };
+            if span > best_max_axis - best_min_axis || (span == best_max_axis - best_min_axis && component_size > best_chain_size) {
+                best_min_axis = component_min;
+                best_max_axis = component_max;
+                best_chain_size = component_size;
+            }
+        }
+
+        let span = if best_max_axis >= best_min_axis { best_max_axis - best_min_axis } else { 0 };
+        let reach_frac = span as f32 / (size - 1) as f32;
+        (reach_frac, best_chain_size)
+    }
+
+    /// Usage:
     ///     let dist = HexEvaluator::shortest_path(board, RED);
     /// Usage Example:
     ///     let red_dist = HexEvaluator::shortest_path(&board, RED);
@@ -308,8 +440,29 @@ impl HexEvaluator {
         // 2. Classical Heuristic Features (supplementary signal)
         let heuristic_score = Self::compute_heuristic_score(board, player);
 
-        // 3. Blend: 60% resistance (accurate global), 40% heuristic (tactical features)
-        resistance_score * 0.6 + heuristic_score * 0.4
+        // 3. Blend: 75% resistance (accurate global, captures bridge chains),
+        //    25% heuristic (tactical features, center control)
+        let mut score = resistance_score * 0.75 + heuristic_score * 0.25;
+
+        // 4. Bridge-Chain Threat Detection: penalize if opponent has a long
+        //    bridge-connected chain spanning most of the board axis
+        let opponent = if player == RED { BLUE } else { RED };
+        let (opp_reach, _opp_chain_size) = Self::bridge_chain_reach(board, opponent);
+        if opp_reach >= 0.5 {
+            // Exponential penalty as opponent chain approaches full span
+            // At 50% reach: -30, at 70%: -80, at 90%: -180, at 100%: -300
+            let threat = (opp_reach - 0.4) * 500.0;
+            score -= threat;
+        }
+
+        // 5. Bonus if our own chain is extensive
+        let (my_reach, _my_chain_size) = Self::bridge_chain_reach(board, player);
+        if my_reach >= 0.5 {
+            let bonus = (my_reach - 0.4) * 300.0;
+            score += bonus;
+        }
+
+        score
     }
 
     /// Usage:
@@ -327,7 +480,20 @@ impl HexEvaluator {
         } else if winner != EMPTY {
             return -WIN_SCORE;
         }
-        Self::compute_heuristic_score(board, player)
+        let mut score = Self::compute_heuristic_score(board, player);
+
+        // Bridge-chain threat detection in fast eval too (critical for deep leaves)
+        let opponent = if player == RED { BLUE } else { RED };
+        let (opp_reach, _) = Self::bridge_chain_reach(board, opponent);
+        if opp_reach >= 0.5 {
+            score -= (opp_reach - 0.4) * 400.0;
+        }
+        let (my_reach, _) = Self::bridge_chain_reach(board, player);
+        if my_reach >= 0.5 {
+            score += (my_reach - 0.4) * 250.0;
+        }
+
+        score
     }
 
     /// Usage:
@@ -340,21 +506,22 @@ impl HexEvaluator {
         let my_dist = Self::shortest_path(board, player) as i16;
         let opp_dist = Self::shortest_path(board, opponent) as i16;
 
+        // Amplified threat scoring — virtual connections (dist=0) are near-wins
         let my_threat_score = match my_dist {
-            0 => 500.0,
-            1 => 280.0,
-            2 => 160.0,
-            3 => 90.0,
-            4 => 45.0,
+            0 => 800.0,  // Virtual connection = nearly won
+            1 => 400.0,  // One stone from virtual connection
+            2 => 200.0,
+            3 => 100.0,
+            4 => 50.0,
             d => (11.0 - d as f32).max(0.0) * 12.0,
         };
 
         let opp_threat_score = match opp_dist {
-            0 => 500.0,
-            1 => 280.0,
-            2 => 160.0,
-            3 => 90.0,
-            4 => 45.0,
+            0 => 800.0,  // Opponent virtual connection = nearly lost
+            1 => 400.0,
+            2 => 200.0,
+            3 => 100.0,
+            4 => 50.0,
             d => (11.0 - d as f32).max(0.0) * 12.0,
         };
 
@@ -689,6 +856,65 @@ impl HexEvaluator {
                     p += 65.0;
                 }
             }
+
+            // Bridge-Chain Carrier Interception: if this cell is a carrier of an
+            // opponent 2-bridge that's part of a long chain, boost heavily to disrupt it.
+            // Check if this empty cell sits between two opponent stones as a carrier.
+            let mut is_opp_bridge_carrier = false;
+            for k in 0..6 {
+                let (br, bc, c1r, c1c, c2r, c2c) = B2_OFFSETS[k];
+                // Check if (r,c) is carrier1 of a bridge between two opponent stones
+                // Carrier1 position: stone_a at (r-c1r, c-c1c) and stone_b at (r-c1r+br, c-c1c+bc)
+                let stone_a_r = ur - c1r;
+                let stone_a_c = uc - c1c;
+                let stone_b_r = stone_a_r + br;
+                let stone_b_c = stone_a_c + bc;
+                if stone_a_r >= 0 && stone_a_r < size as isize && stone_a_c >= 0 && stone_a_c < size as isize
+                    && stone_b_r >= 0 && stone_b_r < size as isize && stone_b_c >= 0 && stone_b_c < size as isize
+                {
+                    if board.get_cell(stone_a_r as usize, stone_a_c as usize) == opponent
+                        && board.get_cell(stone_b_r as usize, stone_b_c as usize) == opponent
+                    {
+                        // This cell is indeed carrier1 of an opponent bridge
+                        // Check if carrier2 is still open (if so, this disruption matters)
+                        let carrier2_r = stone_a_r + c2r;
+                        let carrier2_c = stone_a_c + c2c;
+                        if carrier2_r >= 0 && carrier2_r < size as isize
+                            && carrier2_c >= 0 && carrier2_c < size as isize
+                        {
+                            if board.get_cell(carrier2_r as usize, carrier2_c as usize) == EMPTY {
+                                is_opp_bridge_carrier = true;
+                                p += 95.0; // Strong boost for disrupting opponent bridge
+                            }
+                        }
+                    }
+                }
+
+                // Also check if (r,c) is carrier2
+                let stone_a2_r = ur - c2r;
+                let stone_a2_c = uc - c2c;
+                let stone_b2_r = stone_a2_r + br;
+                let stone_b2_c = stone_a2_c + bc;
+                if stone_a2_r >= 0 && stone_a2_r < size as isize && stone_a2_c >= 0 && stone_a2_c < size as isize
+                    && stone_b2_r >= 0 && stone_b2_r < size as isize && stone_b2_c >= 0 && stone_b2_c < size as isize
+                {
+                    if board.get_cell(stone_a2_r as usize, stone_a2_c as usize) == opponent
+                        && board.get_cell(stone_b2_r as usize, stone_b2_c as usize) == opponent
+                    {
+                        let carrier1_r = stone_a2_r + c1r;
+                        let carrier1_c = stone_a2_c + c1c;
+                        if carrier1_r >= 0 && carrier1_r < size as isize
+                            && carrier1_c >= 0 && carrier1_c < size as isize
+                        {
+                            if board.get_cell(carrier1_r as usize, carrier1_c as usize) == EMPTY {
+                                is_opp_bridge_carrier = true;
+                                p += 95.0;
+                            }
+                        }
+                    }
+                }
+            }
+            let _ = is_opp_bridge_carrier; // suppress unused warning
 
             scored_moves.push(((r, c), p));
         }
