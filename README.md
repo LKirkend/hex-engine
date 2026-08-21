@@ -47,9 +47,13 @@ This script automatically builds the Rust SIMD Bitboard core in release mode, co
 - **`[Import PGN]`**: Import PGN algebraic notation directly from clipboard and replay into the tree.
 - **`[Size -] / [+]`**: Adjust board size with resize confirmation dialog (3x3 to 13x13).
 - **`[Depth -] / [+]`**: Adjust engine search depth dynamically without resetting search (or press `+` / `-`).
+- **`[Engine Selection Dropdown]`**: Switch between **Main Engine (Nash / PVS Minimax)** and **NIC Replica (Nintendo Clubhouse AI)** in the right-side analysis pane.
+- **`Acute Corner Borders (K1 & A11)`**: Outer border crests at K1 (Top) and A11 (Bottom) are rendered with a 50/50 half-Red, half-Blue split, visually indicating both players can complete through apex corners.
+- **`Per-Move PGN Calculation Metadata`**: Exported PGN strings record per-move search depth (`[%depth]`), calculation time (`[%emt]`), and evaluation (`[%eval]`).
 - **`[Swap Turn]`**: Swaps player starting turn order (BLUE $\leftrightarrow$ RED) and resets the board with a confirmation dialog.
 - **`Tab`**: Collapse or expand the right-hand candidate leaderboard & PGN pane.
 - **Left Mouse Click**: Place a stone on the hovered board cell.
+
 
 ---
 

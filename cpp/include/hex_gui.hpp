@@ -32,6 +32,7 @@ public:
     SDL_Renderer* renderer = nullptr;
     HexBoard board;
     HexEngine engine;
+    NicEngine nic_engine;
     BoardRenderer board_renderer;
     AnalysisPanel analysis_panel;
     ConfirmationModal size_modal;
@@ -140,11 +141,21 @@ public:
     void place_human_move(int r, int c) {
         if (board.get_winner() != EMPTY) return;
         uint8_t cur_player = board.current_player;
+        int d = 0;
+        double t = 0.0;
+        float ev = 0.0f;
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex);
+            d = ui_stats.depth;
+            t = ui_stats.elapsed_sec;
+            ev = ui_stats.eval_score;
+        }
         if (board.place_move(r, c, cur_player)) {
-            move_tree.add_or_select_move(r, c, cur_player);
+            move_tree.add_or_select_move(r, c, cur_player, d, t, ev);
             start_fresh_search();
         }
     }
+
 
     /**
      * Usage: app.undo_move();
@@ -417,6 +428,25 @@ private:
                 return;
             }
         }
+        // Check if Engine selection dropdown options were clicked
+        if (analysis_panel.is_engine_dropdown_open) {
+            if (auto chosen = analysis_panel.hit_test_engine_dropdown_options(mx, my)) {
+                analysis_panel.active_engine = *chosen;
+                analysis_panel.is_engine_dropdown_open = false;
+                show_toast(*chosen == 1 ? "Active: NIC Replica (Clubhouse AI)" : "Active: Main Engine (Nash PVS)");
+                start_fresh_search();
+                return;
+            }
+            // Clicking elsewhere closes dropdown
+            analysis_panel.is_engine_dropdown_open = false;
+        }
+
+        // Check if Engine selection dropdown button was clicked
+        if (analysis_panel.hit_test_engine_btn(mx, my)) {
+            analysis_panel.is_engine_dropdown_open = !analysis_panel.is_engine_dropdown_open;
+            return;
+        }
+
         // Check if move token in analysis panel was clicked
         if (auto tok_id = analysis_panel.get_clicked_move_token(mx, my)) {
             select_tree_node(*tok_id);
@@ -424,6 +454,7 @@ private:
         }
         if (hover_cell.has_value()) place_human_move(hover_cell.value().first, hover_cell.value().second);
     }
+
 
     void handle_key_event(const SDL_Event& ev) {
         if (ev.key.key == SDLK_ESCAPE) {
@@ -481,7 +512,41 @@ private:
             return;
         }
 
+        // NIC Replica Mode
+        if (analysis_panel.active_engine == 1) {
+            auto t0 = std::chrono::steady_clock::now();
+            auto [best_mv, score] = nic_engine.select_move(board, board.current_player);
+            auto t1 = std::chrono::steady_clock::now();
+            double elapsed = std::chrono::duration<double>(t1 - t0).count();
+
+            std::string b_str = "-";
+            std::vector<TopMove> nic_moves;
+            if (best_mv.has_value()) {
+                auto [r, c] = best_mv.value();
+                b_str = std::string(1, static_cast<char>('A' + c)) + std::to_string(r + 1);
+                nic_moves.push_back({1, r, c, score, 3});
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(stats_mutex);
+                ui_stats.top_moves = nic_moves;
+                ui_stats.depth = 3;
+                ui_stats.nodes = 1;
+                ui_stats.nps = 0;
+                ui_stats.elapsed_sec = elapsed;
+                ui_stats.eval_score = score;
+                ui_stats.best_move_str = b_str;
+                ui_stats.strategic_plan = "NIC Anshelevich VC hypergraph & Shannon conductance.";
+                ui_stats.threat_level = 2;
+                position_cache[hash] = ui_stats;
+            }
+            is_searching = false;
+            stop_search = false;
+            return;
+        }
+
         auto strategy = board.get_strategy(board.current_player);
+
 
         {
             std::lock_guard<std::mutex> lock(stats_mutex);

@@ -117,6 +117,18 @@ extern "C" {
         int32_t max_top,
         int32_t* out_num_top
     );
+
+    void* nic_engine_create(int32_t depth);
+    void nic_engine_destroy(void* ptr);
+    int32_t nic_engine_select_move(
+        void* nic_ptr,
+        const uint8_t* grid_ptr,
+        int32_t size,
+        int32_t player,
+        int32_t* out_r,
+        int32_t* out_c,
+        float* out_score
+    );
 }
 
 namespace hex {
@@ -536,6 +548,69 @@ public:
             }
         }
         return results;
+    }
+};
+
+/**
+ * Nintendo Impossible Computer (NIC) C++ RAII Engine Wrapper.
+ */
+class NicEngine {
+public:
+    void* handle = nullptr;
+
+    explicit NicEngine(int depth = 3) {
+        handle = nic_engine_create(depth);
+    }
+
+    ~NicEngine() {
+        if (handle) {
+            nic_engine_destroy(handle);
+            handle = nullptr;
+        }
+    }
+
+    NicEngine(const NicEngine&) = delete;
+    NicEngine& operator=(const NicEngine&) = delete;
+
+    NicEngine(NicEngine&& other) noexcept : handle(other.handle) {
+        other.handle = nullptr;
+    }
+
+    NicEngine& operator=(NicEngine&& other) noexcept {
+        if (this != &other) {
+            if (handle) nic_engine_destroy(handle);
+            handle = other.handle;
+            other.handle = nullptr;
+        }
+        return *this;
+    }
+
+    /**
+     * Usage:
+     *     auto [move, score] = nic.select_move(board, player);
+     * Description:
+     *     Executes move selection using Nintendo's Anshelevich VC / conductance gradient AI.
+     */
+    std::pair<std::optional<std::pair<int, int>>, float> select_move(const HexBoard& board, uint8_t player) {
+        if (!handle) return {std::nullopt, 0.0f};
+        int32_t out_r = -1;
+        int32_t out_c = -1;
+        float out_score = 0.0f;
+
+        int status = nic_engine_select_move(
+            handle,
+            board.grid.data(),
+            board.size,
+            player,
+            &out_r,
+            &out_c,
+            &out_score
+        );
+
+        if (status != 0 && out_r >= 0 && out_c >= 0) {
+            return {std::make_pair(out_r, out_c), out_score};
+        }
+        return {std::nullopt, 0.0f};
     }
 };
 

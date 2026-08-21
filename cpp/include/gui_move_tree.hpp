@@ -14,6 +14,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <iomanip>
 #include <algorithm>
 #include <cstdint>
 #include <optional>
@@ -30,6 +31,9 @@ struct MoveNode {
     int c = 0;
     uint8_t player = 0;
     int ply = 0;
+    int depth = 0;
+    double elapsed_sec = 0.0;
+    float eval_score = 0.0f;
     std::vector<int> children;
     bool is_deleted = false;
 
@@ -167,14 +171,15 @@ public:
 
     /**
      * Usage:
-     *     int id = tree.add_or_select_move(r, c, player);
+     *     int id = tree.add_or_select_move(r, c, player, depth, elapsed_sec, eval_score);
      * Usage Example:
-     *     int id = tree.add_or_select_move(5, 5, RED);
+     *     int id = tree.add_or_select_move(5, 5, RED, 14, 0.450, 1.2f);
      * Description:
      *     Adds move as a child of the current node if not already present,
      *     or navigates to the existing child, returning the new current node ID.
+     *     Records calculation search depth, elapsed calculation time, and eval score.
      */
-    int add_or_select_move(int r, int c, uint8_t player) {
+    int add_or_select_move(int r, int c, uint8_t player, int depth = 0, double elapsed_sec = 0.0, float eval_score = 0.0f) {
         if (current_node_id < 0 || current_node_id >= static_cast<int>(nodes.size())) {
             current_node_id = 0;
         }
@@ -182,8 +187,11 @@ public:
         // Check if move already exists among active children
         for (int child_id : nodes[current_node_id].children) {
             if (child_id >= 0 && child_id < static_cast<int>(nodes.size())) {
-                const auto& child = nodes[child_id];
+                auto& child = nodes[child_id];
                 if (!child.is_deleted && child.r == r && child.c == c) {
+                    if (depth > 0) child.depth = depth;
+                    if (elapsed_sec > 0.0) child.elapsed_sec = elapsed_sec;
+                    if (eval_score != 0.0f) child.eval_score = eval_score;
                     current_node_id = child_id;
                     return child_id;
                 }
@@ -199,6 +207,9 @@ public:
         new_node.c = c;
         new_node.player = player;
         new_node.ply = nodes[current_node_id].ply + 1;
+        new_node.depth = depth;
+        new_node.elapsed_sec = elapsed_sec;
+        new_node.eval_score = eval_score;
         new_node.is_deleted = false;
 
         nodes.push_back(new_node);
@@ -206,6 +217,7 @@ public:
         current_node_id = new_id;
         return new_id;
     }
+
 
     /**
      * Usage:
@@ -586,14 +598,40 @@ public:
     }
 
 private:
+    static std::string format_node_metadata(const MoveNode& node) {
+        if (node.depth <= 0 && node.elapsed_sec <= 0.0 && node.eval_score == 0.0f) {
+            return "";
+        }
+        std::stringstream ss;
+        ss << "{";
+        bool first = true;
+        if (node.depth > 0) {
+            ss << "[%depth " << node.depth << "]";
+            first = false;
+        }
+        if (node.elapsed_sec > 0.0) {
+            if (!first) ss << " ";
+            ss << "[%emt " << std::fixed << std::setprecision(3) << node.elapsed_sec << "]";
+            first = false;
+        }
+        if (node.eval_score != 0.0f) {
+            if (!first) ss << " ";
+            ss << "[%eval " << std::showpos << std::fixed << std::setprecision(2) << node.eval_score << std::noshowpos << "]";
+        }
+        ss << "} ";
+        return ss.str();
+    }
+
     void format_tree_pgn_recursive(int node_id, std::stringstream& ss, bool start_with_num) const {
         if (node_id < 0 || node_id >= static_cast<int>(nodes.size())) return;
         const auto& node = nodes[node_id];
 
         std::vector<int> active_children;
         for (int ch_id : node.children) {
-            if (ch_id >= 0 && ch_id < static_cast<int>(nodes.size()) && !nodes[ch_id].is_deleted) {
-                active_children.push_back(ch_id);
+            if (ch_id >= 0 && ch_id < static_cast<int>(nodes.size())) {
+                if (!nodes[ch_id].is_deleted) {
+                    active_children.push_back(ch_id);
+                }
             }
         }
         if (active_children.empty()) return;
@@ -602,13 +640,14 @@ private:
         const auto& prim_node = nodes[primary_id];
 
         int move_num = (prim_node.ply + 1) / 2;
+        std::string prim_meta = format_node_metadata(prim_node);
         if (prim_node.ply % 2 != 0) {
-            ss << move_num << ". " << prim_node.to_algebraic() << " ";
+            ss << move_num << ". " << prim_node.to_algebraic() << " " << prim_meta;
         } else {
             if (start_with_num) {
-                ss << move_num << "... " << prim_node.to_algebraic() << " ";
+                ss << move_num << "... " << prim_node.to_algebraic() << " " << prim_meta;
             } else {
-                ss << prim_node.to_algebraic() << " ";
+                ss << prim_node.to_algebraic() << " " << prim_meta;
             }
         }
 
@@ -618,10 +657,11 @@ private:
             const auto& var_node = nodes[var_id];
             ss << "(";
             int v_num = (var_node.ply + 1) / 2;
+            std::string var_meta = format_node_metadata(var_node);
             if (var_node.ply % 2 != 0) {
-                ss << v_num << ". " << var_node.to_algebraic() << " ";
+                ss << v_num << ". " << var_node.to_algebraic() << " " << var_meta;
             } else {
-                ss << v_num << "... " << var_node.to_algebraic() << " ";
+                ss << v_num << "... " << var_node.to_algebraic() << " " << var_meta;
             }
             format_tree_pgn_recursive(var_id, ss, false);
             ss << ") ";
@@ -630,6 +670,7 @@ private:
         bool next_needs_num = (active_children.size() > 1);
         format_tree_pgn_recursive(primary_id, ss, next_needs_num);
     }
+
 
     bool is_descendant_of(int check_id, int ancestor_id) const {
         int curr = check_id;

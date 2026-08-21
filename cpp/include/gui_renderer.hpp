@@ -253,50 +253,75 @@ private:
         float sqrt3 = std::sqrt(3.0f);
         float h_half = sqrt3 / 2.0f * hex_radius;
 
-        // Top-Left Red Border (along row 0, cols 0..s-1)
+        // 1. Top-Left Red Border (along row 0, cols 0..s-1)
         for (int c = 0; c < s; c++) {
             Point2D pt = get_hex_center(0, c);
             Point2D p_left{pt.x - hex_radius, pt.y};
             Point2D p_top_left{pt.x - 0.5f * hex_radius, pt.y - h_half};
             Point2D p_top_right{pt.x + 0.5f * hex_radius, pt.y - h_half};
+            Point2D p_top_mid{pt.x, pt.y - h_half};
 
             draw_thick_line(ren, p_left.x, p_left.y, p_top_left.x, p_top_left.y, 4, 211, 47, 47);
-            draw_thick_line(ren, p_top_left.x, p_top_left.y, p_top_right.x, p_top_right.y, 4, 211, 47, 47);
+            if (c < s - 1) {
+                draw_thick_line(ren, p_top_left.x, p_top_left.y, p_top_right.x, p_top_right.y, 4, 211, 47, 47);
+            } else {
+                // K1 Acute Top Corner: Left half of top crest is Red
+                draw_thick_line(ren, p_top_left.x, p_top_left.y, p_top_mid.x, p_top_mid.y, 4, 211, 47, 47);
+            }
         }
 
-        // Bottom-Right Red Border (along row s-1, cols 0..s-1)
+        // 2. Bottom-Right Red Border (along row s-1, cols 0..s-1)
         for (int c = 0; c < s; c++) {
             Point2D pt = get_hex_center(s - 1, c);
             Point2D p_bot_left{pt.x - 0.5f * hex_radius, pt.y + h_half};
             Point2D p_bot_right{pt.x + 0.5f * hex_radius, pt.y + h_half};
+            Point2D p_bot_mid{pt.x, pt.y + h_half};
             Point2D p_right{pt.x + hex_radius, pt.y};
 
-            draw_thick_line(ren, p_bot_left.x, p_bot_left.y, p_bot_right.x, p_bot_right.y, 4, 211, 47, 47);
+            if (c > 0) {
+                draw_thick_line(ren, p_bot_left.x, p_bot_left.y, p_bot_right.x, p_bot_right.y, 4, 211, 47, 47);
+            } else {
+                // A11 Acute Bottom Corner: Right half of bottom crest is Red
+                draw_thick_line(ren, p_bot_mid.x, p_bot_mid.y, p_bot_right.x, p_bot_right.y, 4, 211, 47, 47);
+            }
             draw_thick_line(ren, p_bot_right.x, p_bot_right.y, p_right.x, p_right.y, 4, 211, 47, 47);
         }
 
-        // Bottom-Left Blue Border (along col 0, rows 0..s-1)
+        // 3. Bottom-Left Blue Border (along col 0, rows 0..s-1)
         for (int r = 0; r < s; r++) {
             Point2D pt = get_hex_center(r, 0);
             Point2D p_left{pt.x - hex_radius, pt.y};
             Point2D p_bot_left{pt.x - 0.5f * hex_radius, pt.y + h_half};
             Point2D p_bot_right{pt.x + 0.5f * hex_radius, pt.y + h_half};
+            Point2D p_bot_mid{pt.x, pt.y + h_half};
 
             draw_thick_line(ren, p_left.x, p_left.y, p_bot_left.x, p_bot_left.y, 4, 25, 118, 210);
-            draw_thick_line(ren, p_bot_left.x, p_bot_left.y, p_bot_right.x, p_bot_right.y, 4, 25, 118, 210);
+            if (r < s - 1) {
+                draw_thick_line(ren, p_bot_left.x, p_bot_left.y, p_bot_right.x, p_bot_right.y, 4, 25, 118, 210);
+            } else {
+                // A11 Acute Bottom Corner: Left half of bottom crest is Blue
+                draw_thick_line(ren, p_bot_left.x, p_bot_left.y, p_bot_mid.x, p_bot_mid.y, 4, 25, 118, 210);
+            }
         }
 
-        // Top-Right Blue Border (along col s-1, rows 0..s-1)
+        // 4. Top-Right Blue Border (along col s-1, rows 0..s-1)
         for (int r = 0; r < s; r++) {
             Point2D pt = get_hex_center(r, s - 1);
             Point2D p_top_left{pt.x - 0.5f * hex_radius, pt.y - h_half};
             Point2D p_top_right{pt.x + 0.5f * hex_radius, pt.y - h_half};
+            Point2D p_top_mid{pt.x, pt.y - h_half};
             Point2D p_right{pt.x + hex_radius, pt.y};
 
-            draw_thick_line(ren, p_top_left.x, p_top_left.y, p_top_right.x, p_top_right.y, 4, 25, 118, 210);
+            if (r > 0) {
+                draw_thick_line(ren, p_top_left.x, p_top_left.y, p_top_right.x, p_top_right.y, 4, 25, 118, 210);
+            } else {
+                // K1 Acute Top Corner: Right half of top crest is Blue
+                draw_thick_line(ren, p_top_mid.x, p_top_mid.y, p_top_right.x, p_top_right.y, 4, 25, 118, 210);
+            }
             draw_thick_line(ren, p_top_right.x, p_top_right.y, p_right.x, p_right.y, 4, 25, 118, 210);
         }
     }
+
 
     void draw_border_labels(SDL_Renderer* ren, int s) const {
         float sqrt3 = std::sqrt(3.0f);

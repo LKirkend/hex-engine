@@ -136,6 +136,11 @@ class AnalysisPanel {
 public:
     bool is_collapsed = false;
     float panel_width = 300.0f;
+    int active_engine = 0; // 0 = Main Engine (Nash), 1 = NIC Replica (Nintendo)
+    bool is_engine_dropdown_open = false;
+    mutable SDL_FRect engine_btn_rect{0, 0, 0, 0};
+    mutable SDL_FRect engine_opt0_rect{0, 0, 0, 0};
+    mutable SDL_FRect engine_opt1_rect{0, 0, 0, 0};
     mutable std::vector<MoveTokenLayout> rendered_move_tokens;
 
     /**
@@ -158,6 +163,37 @@ public:
      */
     void toggle_collapse() {
         is_collapsed = !is_collapsed;
+    }
+
+    /**
+     * Usage:
+     *     bool hit = panel.hit_test_engine_btn(mx, my);
+     * Description:
+     *     Tests if mouse clicked the Engine selection dropdown button.
+     */
+    bool hit_test_engine_btn(float mx, float my) const {
+        return !is_collapsed && mx >= engine_btn_rect.x && mx <= engine_btn_rect.x + engine_btn_rect.w &&
+               my >= engine_btn_rect.y && my <= engine_btn_rect.y + engine_btn_rect.h;
+    }
+
+    /**
+     * Usage:
+     *     auto opt = panel.hit_test_engine_dropdown_options(mx, my);
+     * Description:
+     *     Tests if mouse clicked an item in the open Engine dropdown menu (0 = Main, 1 = NIC).
+     */
+    std::optional<int> hit_test_engine_dropdown_options(float mx, float my) const {
+        if (!is_collapsed && is_engine_dropdown_open) {
+            if (mx >= engine_opt0_rect.x && mx <= engine_opt0_rect.x + engine_opt0_rect.w &&
+                my >= engine_opt0_rect.y && my <= engine_opt0_rect.y + engine_opt0_rect.h) {
+                return 0;
+            }
+            if (mx >= engine_opt1_rect.x && mx <= engine_opt1_rect.x + engine_opt1_rect.w &&
+                my >= engine_opt1_rect.y && my <= engine_opt1_rect.y + engine_opt1_rect.h) {
+                return 1;
+            }
+        }
+        return std::nullopt;
     }
 
     /**
@@ -428,13 +464,30 @@ public:
             render_tree_tokens(ren, tree, px + 16.0f, pgn_y, max_x, stat_y - 12.0f, mx, my);
         }
 
-        // 4. Bottom Section: Engine Live Statistics
+        // 4. Bottom Section: Engine Live Statistics & Engine Model Selector
         SDL_SetRenderDrawColor(ren, 160, 165, 175, 255);
         SDL_RenderLine(ren, px + 16.0f, stat_y - 6.0f, px + panel_width - 16.0f, stat_y - 6.0f);
 
         std::string search_str = stats.is_searching ? "Searching..." : "Engine Idle";
         SDL_SetRenderDrawColor(ren, stats.is_searching ? 100 : 180, stats.is_searching ? 220 : 180, 100, 255);
         SDL_RenderDebugText(ren, px + 16.0f, stat_y, search_str.c_str());
+
+        // Dropdown button for choosing Engine Model (Main Engine vs NIC Replica)
+        float btn_w = 126.0f;
+        float btn_h = 18.0f;
+        float btn_x = px + panel_width - btn_w - 16.0f;
+        float btn_y = stat_y - 2.0f;
+        engine_btn_rect = {btn_x, btn_y, btn_w, btn_h};
+
+        bool btn_hover = (mx >= btn_x && mx <= btn_x + btn_w && my >= btn_y && my <= btn_y + btn_h);
+        SDL_SetRenderDrawColor(ren, btn_hover ? 58 : 42, btn_hover ? 68 : 48, btn_hover ? 86 : 58, 255);
+        SDL_RenderFillRect(ren, &engine_btn_rect);
+        SDL_SetRenderDrawColor(ren, btn_hover ? 160 : 90, btn_hover ? 180 : 105, btn_hover ? 215 : 125, 255);
+        SDL_RenderRect(ren, &engine_btn_rect);
+
+        std::string engine_label = (active_engine == 1) ? "NIC Replica v" : "Main Engine v";
+        SDL_SetRenderDrawColor(ren, 235, 240, 250, 255);
+        SDL_RenderDebugText(ren, btn_x + 6.0f, btn_y + 2.0f, engine_label.c_str());
 
         std::stringstream nodes_ss;
         nodes_ss << "Nodes: " << stats.nodes << " (" << stats.nps << " n/s)";
@@ -448,6 +501,46 @@ public:
         std::string best_str = "Best Move: " + stats.best_move_str;
         SDL_SetRenderDrawColor(ren, 255, 215, 64, 255);
         SDL_RenderDebugText(ren, px + 16.0f, stat_y + 54.0f, best_str.c_str());
+
+        // Floating dropdown popup menu if open
+        if (is_engine_dropdown_open) {
+            float drop_w = 152.0f;
+            float drop_h = 48.0f;
+            float drop_x = px + panel_width - drop_w - 16.0f;
+            float drop_y = btn_y - drop_h - 4.0f; // Opens upward above the button
+
+            SDL_FRect drop_bg{drop_x, drop_y, drop_w, drop_h};
+            SDL_SetRenderDrawColor(ren, 24, 28, 36, 250);
+            SDL_RenderFillRect(ren, &drop_bg);
+            SDL_SetRenderDrawColor(ren, 130, 150, 190, 255);
+            SDL_RenderRect(ren, &drop_bg);
+
+            engine_opt0_rect = {drop_x + 2.0f, drop_y + 2.0f, drop_w - 4.0f, 21.0f};
+            engine_opt1_rect = {drop_x + 2.0f, drop_y + 25.0f, drop_w - 4.0f, 21.0f};
+
+            bool opt0_hover = (mx >= engine_opt0_rect.x && mx <= engine_opt0_rect.x + engine_opt0_rect.w &&
+                               my >= engine_opt0_rect.y && my <= engine_opt0_rect.y + engine_opt0_rect.h);
+            bool opt1_hover = (mx >= engine_opt1_rect.x && mx <= engine_opt1_rect.x + engine_opt1_rect.w &&
+                               my >= engine_opt1_rect.y && my <= engine_opt1_rect.y + engine_opt1_rect.h);
+
+            if (opt0_hover) {
+                SDL_SetRenderDrawColor(ren, 48, 68, 100, 255);
+                SDL_RenderFillRect(ren, &engine_opt0_rect);
+            }
+            if (opt1_hover) {
+                SDL_SetRenderDrawColor(ren, 48, 68, 100, 255);
+                SDL_RenderFillRect(ren, &engine_opt1_rect);
+            }
+
+            SDL_SetRenderDrawColor(ren, active_engine == 0 ? 255 : 210, active_engine == 0 ? 215 : 215, active_engine == 0 ? 64 : 225, 255);
+            std::string opt0_txt = (active_engine == 0 ? "* " : "  ") + std::string("Main Engine (Nash)");
+            SDL_RenderDebugText(ren, drop_x + 6.0f, drop_y + 5.0f, opt0_txt.c_str());
+
+            SDL_SetRenderDrawColor(ren, active_engine == 1 ? 255 : 210, active_engine == 1 ? 215 : 215, active_engine == 1 ? 64 : 225, 255);
+            std::string opt1_txt = (active_engine == 1 ? "* " : "  ") + std::string("NIC Replica (Clubhouse)");
+            SDL_RenderDebugText(ren, drop_x + 6.0f, drop_y + 28.0f, opt1_txt.c_str());
+        }
+
     }
 
 private:

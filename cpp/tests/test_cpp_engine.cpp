@@ -859,6 +859,80 @@ void test_cpp_gui_button_layout_and_strategic_plan_wrapping() {
     std::cout << "[PASS] C++ GUI button layout metrics and strategic plan dynamic text wrapping\n";
 }
 
+/**
+ * Usage:
+ *     test_cpp_nic_engine_wrapper_and_corner_borders();
+ * Description:
+ *     Tests NicEngine C++ wrapper execution and acute corner border split geometry (K1 and A11).
+ */
+void test_cpp_nic_engine_wrapper_and_corner_borders() {
+    // 1. Verify NicEngine C++ wrapper
+    hex::NicEngine nic(3);
+    assert(nic.handle != nullptr);
+
+    hex::HexBoard board(11);
+    auto [mv, score] = nic.select_move(board, hex::BLUE);
+    assert(mv.has_value());
+    auto [r, c] = mv.value();
+    assert(r >= 0 && r < 11 && c >= 0 && c < 11);
+
+    // 2. Verify board acute corner geometry
+    hex::gui::BoardRenderer renderer;
+    renderer.update_layout(1120.0f, 750.0f, 11, false);
+
+    // K1 is at row 0, col 10 (top apex)
+    auto pt_k1 = renderer.get_hex_center(0, 10);
+    // A11 is at row 10, col 0 (bottom apex)
+    auto pt_a11 = renderer.get_hex_center(10, 0);
+
+    assert(pt_k1.y < pt_a11.y); // K1 is above A11
+    assert(std::abs(pt_k1.x - pt_a11.x) < 0.001f); // Both align vertically at the diamond centerline
+
+    std::cout << "[PASS] C++ NicEngine wrapper and acute corner border geometry\n";
+}
+
+/**
+ * Usage:
+ *     test_cpp_pgn_move_metadata_and_dropdown();
+ * Description:
+ *     Tests per-move calculation depth and elapsed time recording in PGN string output
+ *     as well as AnalysisPanel engine dropdown button and option hit-testing.
+ */
+void test_cpp_pgn_move_metadata_and_dropdown() {
+    hex::gui::MoveTree tree;
+    // Add Move 1: Blue plays f6 with depth 14, 0.450s elapsed, score +1.2
+    tree.add_or_select_move(5, 5, hex::BLUE, 14, 0.450, 1.2f);
+    // Add Move 1...: Red plays g6 with depth 14, 1.120s elapsed, score -0.8
+    tree.add_or_select_move(5, 6, hex::RED, 14, 1.120, -0.8f);
+
+    std::string pgn = tree.to_pgn_string(11, hex::BLUE);
+    assert(pgn.find("[First \"Blue\"]") != std::string::npos);
+    assert(pgn.find("1. f6 {[%depth 14] [%emt 0.450] [%eval +1.20]}") != std::string::npos);
+    assert(pgn.find("g6 {[%depth 14] [%emt 1.120] [%eval -0.80]}") != std::string::npos);
+
+    // Verify AnalysisPanel Engine dropdown state & hit-testing
+    hex::gui::AnalysisPanel panel;
+    assert(panel.active_engine == 0); // Default to Main Engine
+    assert(!panel.is_engine_dropdown_open);
+
+    // Simulate dropdown button bounds
+    panel.engine_btn_rect = {900.0f, 600.0f, 126.0f, 18.0f};
+    assert(panel.hit_test_engine_btn(950.0f, 605.0f));
+    assert(!panel.hit_test_engine_btn(800.0f, 605.0f));
+
+    panel.is_engine_dropdown_open = true;
+    panel.engine_opt0_rect = {874.0f, 552.0f, 148.0f, 21.0f};
+    panel.engine_opt1_rect = {874.0f, 575.0f, 148.0f, 21.0f};
+
+    auto opt0 = panel.hit_test_engine_dropdown_options(900.0f, 560.0f);
+    assert(opt0.has_value() && *opt0 == 0);
+
+    auto opt1 = panel.hit_test_engine_dropdown_options(900.0f, 580.0f);
+    assert(opt1.has_value() && *opt1 == 1);
+
+    std::cout << "[PASS] C++ PGN move metadata serialization and AnalysisPanel engine dropdown\n";
+}
+
 int main() {
     std::cout << "--- Running C++20 Engine Unit Tests ---\n";
     test_cpp_board_and_eval();
@@ -882,6 +956,9 @@ int main() {
     test_cpp_eval_bar_scaling_and_snapping();
     test_cpp_cache_and_depth_progression();
     test_cpp_gui_button_layout_and_strategic_plan_wrapping();
+    test_cpp_nic_engine_wrapper_and_corner_borders();
+    test_cpp_pgn_move_metadata_and_dropdown();
     std::cout << "All C++20 unit tests passed successfully!\n";
     return 0;
 }
+
