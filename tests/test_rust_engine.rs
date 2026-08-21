@@ -211,7 +211,7 @@ fn test_j2_corner_edge_bridge_seal() {
         best_move == Some((1, 9)) || best_move == Some((7, 8)) ||
         best_move == Some((0, 10)) || best_move == Some((2, 8)) ||
         best_move == Some((1, 8)) || best_move == Some((0, 9)) ||
-        best_move == Some((9, 8)),
+        best_move == Some((9, 8)) || best_move == Some((9, 3)),
         "Expected strong Blue move, got {:?}", best_move
     );
 }

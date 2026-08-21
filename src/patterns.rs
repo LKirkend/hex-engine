@@ -554,22 +554,49 @@ impl HexPatternMatcher {
         }
 
         // 2. Long-Range Ladder Foil & Edge Interception (Playing Ahead in Corridor)
+        // Only grant foil bonus if the opponent has an active multi-stone runner heading toward this rim (within 3 cells)
         if player == BLUE {
-            if r <= 1 || r >= size - 2 {
-                for check_r in 0..size {
+            if r <= 1 {
+                let mut opp_near = 0;
+                for check_r in 2..=4.min(size - 1) {
                     if board.get_cell(check_r, c) == RED {
-                        bonus += 55.0;
-                        break;
+                        opp_near += 1;
                     }
+                }
+                if opp_near >= 2 {
+                    bonus += 55.0;
+                }
+            } else if r >= size - 2 {
+                let mut opp_near = 0;
+                for check_r in (size.saturating_sub(5))..=(size.saturating_sub(3)) {
+                    if board.get_cell(check_r, c) == RED {
+                        opp_near += 1;
+                    }
+                }
+                if opp_near >= 2 {
+                    bonus += 55.0;
                 }
             }
         } else {
-            if c <= 1 || c >= size - 2 {
-                for check_c in 0..size {
+            if c <= 1 {
+                let mut opp_near = 0;
+                for check_c in 2..=4.min(size - 1) {
                     if board.get_cell(r, check_c) == BLUE {
-                        bonus += 55.0;
-                        break;
+                        opp_near += 1;
                     }
+                }
+                if opp_near >= 2 {
+                    bonus += 55.0;
+                }
+            } else if c >= size - 2 {
+                let mut opp_near = 0;
+                for check_c in (size.saturating_sub(5))..=(size.saturating_sub(3)) {
+                    if board.get_cell(r, check_c) == BLUE {
+                        opp_near += 1;
+                    }
+                }
+                if opp_near >= 2 {
+                    bonus += 55.0;
                 }
             }
         }

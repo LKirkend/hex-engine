@@ -41,7 +41,7 @@ impl HexOpeningBook {
         if board.size == 11 {
             // 1 Stone on board: Responses to Move 1 Openings
             if total_stones == 1 {
-                // 1. F6 (5, 5) -> G6 (5, 6)
+                // 1. F6 (5, 5) -> G6 (5, 6) or E6 (5, 4)
                 if board.get_cell(5, 5) != EMPTY {
                     return Some(((5, 6), "11x11 Academic Edge-Parallel Carrier Defense (G6)"));
                 }
@@ -49,33 +49,41 @@ impl HexOpeningBook {
                 if board.get_cell(4, 4) != EMPTY {
                     return Some(((4, 5), "11x11 Master Long-Diagonal Carrier Defense (F5)"));
                 }
-                // 3. E4 (3, 4) -> F4 (3, 5)
+                // 3. E7 (6, 4) -> F7 (6, 5)
+                if board.get_cell(6, 4) != EMPTY {
+                    return Some(((6, 5), "11x11 Master South-Diagonal Carrier Defense (F7)"));
+                }
+                // 4. E4 (3, 4) -> F4 (3, 5)
                 if board.get_cell(3, 4) != EMPTY {
                     return Some(((3, 5), "11x11 Master Knight Carrier Block (F4)"));
                 }
-                // 4. D3 (2, 3) -> E3 (2, 4)
+                // 5. D3 (2, 3) -> E3 (2, 4)
                 if board.get_cell(2, 3) != EMPTY {
                     return Some(((2, 4), "11x11 Master Short-Diagonal Counter (E3)"));
                 }
-                // 5. C2 (1, 2) -> D2 (1, 3)
+                // 6. C2 (1, 2) -> D2 (1, 3)
                 if board.get_cell(1, 2) != EMPTY {
                     return Some(((1, 3), "11x11 Master Mild Flank Carrier Block (D2)"));
                 }
-                // 6. B2 (1, 1) -> C2 (1, 2)
+                // 7. B2 (1, 1) -> C2 (1, 2)
                 if board.get_cell(1, 1) != EMPTY {
                     return Some(((1, 2), "11x11 Master Acute Corner Containment (C2)"));
                 }
-                // 7. G7 (6, 6) -> F7 (6, 5)
+                // 8. G7 (6, 6) -> F7 (6, 5)
                 if board.get_cell(6, 6) != EMPTY {
                     return Some(((6, 5), "11x11 Master Symmetrical Diagonal Defense (F7)"));
                 }
-                // 8. H4 (3, 7) -> I4 (3, 8)
+                // 9. H4 (3, 7) -> I4 (3, 8)
                 if board.get_cell(3, 7) != EMPTY {
                     return Some(((3, 8), "11x11 Master East Diagonal Carrier Block (I4)"));
                 }
-                // 9. C9 (8, 2) -> D9 (8, 3)
+                // 10. C9 (8, 2) -> D9 (8, 3)
                 if board.get_cell(8, 2) != EMPTY {
                     return Some(((8, 3), "11x11 Master Obtuse Flank Wedge (D9)"));
+                }
+                // 11. E2 (1, 4) -> E3 (2, 4)
+                if board.get_cell(1, 4) != EMPTY {
+                    return Some(((2, 4), "11x11 Master Flank Counter (E3)"));
                 }
             }
 
@@ -117,9 +125,13 @@ impl HexOpeningBook {
                 if Self::has_stones(board, &[(3, 7), (3, 8)]) {
                     return Some(((2, 8), "11x11 Master East 2-Bridge Extension (I3)"));
                 }
-                // 9. C9 D9 -> E8 (7, 4)
-                if Self::has_stones(board, &[(8, 2), (8, 3)]) {
+                // 9. C9 D9 / C9 B9 -> E8 (7, 4)
+                if Self::has_stones(board, &[(8, 2), (8, 3)]) || Self::has_stones(board, &[(8, 2), (8, 1)]) {
                     return Some(((7, 4), "11x11 Master 2-Bridge Central Incline (E8)"));
+                }
+                // 10. H5 G6 / H5 I5 -> H4 (3, 7)
+                if Self::has_stones(board, &[(4, 7), (5, 6)]) || Self::has_stones(board, &[(4, 7), (4, 8)]) {
+                    return Some(((3, 7), "11x11 Master East Incline Thrust (H4)"));
                 }
             }
 
@@ -133,6 +145,10 @@ impl HexOpeningBook {
                 if Self::has_stones(board, &[(5, 5), (5, 4), (6, 4)]) {
                     return Some(((4, 7), "11x11 Symmetrical Carrier Block (H5)"));
                 }
+                // 2. E5 F5 2. C6 -> D6 (5, 3)
+                if Self::has_stones(board, &[(4, 4), (4, 5), (5, 2)]) {
+                    return Some(((5, 3), "11x11 Master Central Block & 2-Bridge Wedge (D6)"));
+                }
                 // 2. E5 F5 2. F4 -> D6 (5, 3)
                 if Self::has_stones(board, &[(4, 4), (4, 5), (3, 5)]) {
                     return Some(((5, 3), "11x11 Master Central Block & 2-Bridge Wedge (D6)"));
@@ -140,6 +156,10 @@ impl HexOpeningBook {
                 // 3. E4 F4 2. F3 -> D5 (4, 3)
                 if Self::has_stones(board, &[(3, 4), (3, 5), (2, 5)]) {
                     return Some(((4, 3), "11x11 Master Central Flank Containment (D5)"));
+                }
+                // 4. D4 D6 2. B5 -> C5 (4, 2)
+                if Self::has_stones(board, &[(3, 3), (5, 3), (4, 1)]) {
+                    return Some(((4, 2), "11x11 Master Corridor Barrier (C5)"));
                 }
             }
         }
@@ -233,6 +253,7 @@ impl HexOpeningBook {
                     moves.push((5, 4)); // E6
                 }
                 if board.get_cell(4, 4) != EMPTY { moves.push((4, 5)); } // E5 -> F5
+                if board.get_cell(6, 4) != EMPTY { moves.push((6, 5)); } // E7 -> F7
                 if board.get_cell(3, 4) != EMPTY { moves.push((3, 5)); } // E4 -> F4
                 if board.get_cell(2, 3) != EMPTY { moves.push((2, 4)); } // D3 -> E3
                 if board.get_cell(1, 2) != EMPTY { moves.push((1, 3)); } // C2 -> D2
@@ -240,6 +261,7 @@ impl HexOpeningBook {
                 if board.get_cell(6, 6) != EMPTY { moves.push((6, 5)); } // G7 -> F7
                 if board.get_cell(3, 7) != EMPTY { moves.push((3, 8)); } // H4 -> I4
                 if board.get_cell(8, 2) != EMPTY { moves.push((8, 3)); } // C9 -> D9
+                if board.get_cell(1, 4) != EMPTY { moves.push((2, 4)); } // E2 -> E3
             } else if total_stones == 2 {
                 if Self::has_stones(board, &[(5, 5), (5, 6)]) { moves.push((4, 6)); } // F6 G6 -> G5
                 if Self::has_stones(board, &[(5, 5), (5, 4)]) { moves.push((6, 4)); } // F6 E6 -> E7

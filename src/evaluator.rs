@@ -447,18 +447,16 @@ impl HexEvaluator {
         // 4. Bridge-Chain Threat Detection: penalize if opponent has a long
         //    bridge-connected chain spanning most of the board axis
         let opponent = if player == RED { BLUE } else { RED };
-        let (opp_reach, _opp_chain_size) = Self::bridge_chain_reach(board, opponent);
-        if opp_reach >= 0.5 {
-            // Exponential penalty as opponent chain approaches full span
-            // At 50% reach: -30, at 70%: -80, at 90%: -180, at 100%: -300
-            let threat = (opp_reach - 0.4) * 500.0;
+        let (opp_reach, opp_chain_size) = Self::bridge_chain_reach(board, opponent);
+        if opp_reach >= 0.35 {
+            let threat = (opp_reach - 0.3) * 550.0 + (opp_chain_size as f32) * 12.0;
             score -= threat;
         }
 
         // 5. Bonus if our own chain is extensive
-        let (my_reach, _my_chain_size) = Self::bridge_chain_reach(board, player);
-        if my_reach >= 0.5 {
-            let bonus = (my_reach - 0.4) * 300.0;
+        let (my_reach, my_chain_size) = Self::bridge_chain_reach(board, player);
+        if my_reach >= 0.35 {
+            let bonus = (my_reach - 0.3) * 350.0 + (my_chain_size as f32) * 8.0;
             score += bonus;
         }
 
@@ -484,13 +482,13 @@ impl HexEvaluator {
 
         // Bridge-chain threat detection in fast eval too (critical for deep leaves)
         let opponent = if player == RED { BLUE } else { RED };
-        let (opp_reach, _) = Self::bridge_chain_reach(board, opponent);
-        if opp_reach >= 0.5 {
-            score -= (opp_reach - 0.4) * 400.0;
+        let (opp_reach, opp_chain_size) = Self::bridge_chain_reach(board, opponent);
+        if opp_reach >= 0.35 {
+            score -= (opp_reach - 0.3) * 450.0 + (opp_chain_size as f32) * 10.0;
         }
-        let (my_reach, _) = Self::bridge_chain_reach(board, player);
-        if my_reach >= 0.5 {
-            score += (my_reach - 0.4) * 250.0;
+        let (my_reach, my_chain_size) = Self::bridge_chain_reach(board, player);
+        if my_reach >= 0.35 {
+            score += (my_reach - 0.3) * 280.0 + (my_chain_size as f32) * 6.0;
         }
 
         score
@@ -769,9 +767,9 @@ impl HexEvaluator {
                             player
                         };
                         if twin_cell == player {
-                            p += 90.0;
+                            p += 120.0;
                         } else if twin_cell == EMPTY {
-                            p -= 55.0;
+                            p += 85.0; // Proactive carrier interception
                         }
                     }
                 }
@@ -794,9 +792,9 @@ impl HexEvaluator {
                             player
                         };
                         if twin_cell2 == player {
-                            p += 90.0;
+                            p += 120.0;
                         } else if twin_cell2 == EMPTY {
-                            p -= 55.0;
+                            p += 85.0; // Proactive carrier interception
                         }
                     }
                 }

@@ -138,6 +138,37 @@ impl SearchEngine {
                 top_moves,
             };
             return (best_move, best_score, stats);
+        } else if total_stones <= 3 {
+            if let Some(((br, bc), b_note)) = HexOpeningBook::get_opening_move(board, player) {
+                if board.get_cell(br, bc) == EMPTY {
+                    let mut top_moves = self.get_initial_candidates(board, player, 6);
+                    if let Some(pos) = top_moves.iter().position(|m| m.r == br && m.c == bc) {
+                        let entry = top_moves.remove(pos);
+                        top_moves.insert(0, entry);
+                    } else {
+                        top_moves.insert(0, TopMoveEntry {
+                            rank: 1,
+                            r: br,
+                            c: bc,
+                            score: 0.0,
+                            depth: max_depth,
+                            note: Some(b_note.to_string()),
+                        });
+                    }
+                    for (i, m) in top_moves.iter_mut().enumerate() {
+                        m.rank = i + 1;
+                    }
+                    let stats = SearchStats {
+                        nodes: 1,
+                        time_sec: 0.001,
+                        nps: 10000,
+                        depth_reached: max_depth,
+                        is_final: true,
+                        top_moves,
+                    };
+                    return (Some((br, bc)), 0.0, stats);
+                }
+            }
         }
 
         let mut best_move = None;
