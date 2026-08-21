@@ -14,3 +14,4 @@ build/
 *.so
 *.a
 .DS_Store
+games/

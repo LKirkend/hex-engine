@@ -121,6 +121,16 @@ fn main() {
         &["e5", "f5", "f4", "h4", "h3", "i3", "c7", "j2", "d5", "e7", "g6", "d9"]
     );
 
+    verify_nic_responses(
+        "Game 6 (d9): 1. f6 e6 2. i5 d8 3. k4 f4 4. c7 c10 5. g6 g2",
+        &["f6", "e6", "i5", "d8", "k4", "f4", "c7", "c10", "g6", "g2"]
+    );
+
+    verify_nic_responses(
+        "Game 7 (NIC clone): 1. c9 f8 2. b8 e7 3. d7 f5 4. c6 g3 5. b5 e10 6. b11 f2",
+        &["c9", "f8", "b8", "e7", "d7", "f5", "c6", "g3", "b5", "e10", "b11", "f2"]
+    );
+
     // === Double-Bridge Chain Detection ===
     println!("\n\n========== DOUBLE-BRIDGE CHAIN DETECTION ==========");
     
@@ -137,6 +147,16 @@ fn main() {
     analyze_double_bridge_chain(
         "Game 5 final",
         &["e5", "f5", "f4", "h4", "h3", "i3", "c7", "j2", "d5", "e7", "g6", "d9"]
+    );
+
+    analyze_double_bridge_chain(
+        "Game 6 final (f6 e6 i5 d8 k4 f4 c7 c10 g6 g2)",
+        &["f6", "e6", "i5", "d8", "k4", "f4", "c7", "c10", "g6", "g2"]
+    );
+
+    analyze_double_bridge_chain(
+        "Game 7 final (c9 f8 b8 e7 d7 f5 c6 g3 b5 e10 b11 f2)",
+        &["c9", "f8", "b8", "e7", "d7", "f5", "c6", "g3", "b5", "e10", "b11", "f2"]
     );
 
     // === Engine Top Moves at Critical Positions ===
