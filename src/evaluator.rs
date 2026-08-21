@@ -158,8 +158,7 @@ impl HexEvaluator {
 
         // Build adjacency including 2-bridge virtual links
         let mut visited = [false; 196];
-        let mut best_min_axis = size;
-        let mut best_max_axis = 0usize;
+        let mut best_span = 0usize;
         let mut best_chain_size = 0usize;
 
         for &start_idx in &stones {
@@ -179,6 +178,14 @@ impl HexEvaluator {
                 component_min = component_min.min(axis_val);
                 component_max = component_max.max(axis_val);
                 component_size += 1;
+
+                // Check edge template connections for this stone
+                if crate::patterns::HexPatternMatcher::is_stone_connected_to_source_edge(board, cr, cc, player) {
+                    component_min = 0;
+                }
+                if crate::patterns::HexPatternMatcher::is_stone_connected_to_sink_edge(board, cr, cc, player) {
+                    component_max = size - 1;
+                }
 
                 // Direct hex neighbors
                 for k in 0..6 {
@@ -226,38 +233,14 @@ impl HexEvaluator {
                 }
             }
 
-            // Also count edge connectivity: if component touches source/sink edges via
-            // edge templates, extend the axis range
-            // Source edge: row 0 for Red, col 0 for Blue
-            // Sink edge: row size-1 for Red, col size-1 for Blue
-            if player == RED {
-                if component_min <= 2 {
-                    // Check if any stone in the component connects to north edge via template
-                    // Approximate: if min row is 0-2 and stone has template connection, treat as row 0
-                    component_min = 0;
-                }
-                if component_max >= size - 3 {
-                    component_max = size - 1;
-                }
-            } else {
-                if component_min <= 2 {
-                    component_min = 0;
-                }
-                if component_max >= size - 3 {
-                    component_max = size - 1;
-                }
-            }
-
             let span = if component_max >= component_min { component_max - component_min } else { 0 };
-            if span > best_max_axis - best_min_axis || (span == best_max_axis - best_min_axis && component_size > best_chain_size) {
-                best_min_axis = component_min;
-                best_max_axis = component_max;
+            if span > best_span || (span == best_span && component_size > best_chain_size) {
+                best_span = span;
                 best_chain_size = component_size;
             }
         }
 
-        let span = if best_max_axis >= best_min_axis { best_max_axis - best_min_axis } else { 0 };
-        let reach_frac = span as f32 / (size - 1) as f32;
+        let reach_frac = best_span as f32 / (size - 1) as f32;
         (reach_frac, best_chain_size)
     }
 
