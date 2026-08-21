@@ -151,12 +151,16 @@ impl NicReplicaEngine {
             let delta_g_own = (after_g_own - base_g_own).max(0.0);
             let delta_g_opp = (base_g_opp - after_g_opp).max(0.0);
 
-            // Small center bias (NIC slightly prefers central moves, all else equal)
-            let dr = r as f32 - center;
-            let dc = c as f32 - center;
-            let center_bias = (center - (dr * dr + dc * dc).sqrt()) * 0.5;
+            // Center bias (NIC prioritizes central contest, especially in opening/early middle game)
+            let center_bias = if size == 11 {
+                crate::evaluator::CENTER_11[r * size + c] * 2.0
+            } else {
+                let dr = r as f32 - center;
+                let dc = c as f32 - center;
+                (center - (dr * dr + dc * dc).sqrt()).max(0.0) * 2.0
+            };
 
-            // NIC composite score: pure conductance deltas + tiny center tiebreaker
+            // NIC composite score: pure conductance deltas + center tiebreaker
             let total_score = delta_g_own * 100.0
                 + delta_g_opp * 80.0
                 + center_bias;

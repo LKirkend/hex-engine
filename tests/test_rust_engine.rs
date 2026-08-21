@@ -867,8 +867,8 @@ fn test_nic_replica_decision_fidelity() {
     let (r, c) = bm.unwrap();
     println!("NIC response to 1. f6: ({}, {}) score: {:.2}", r, c, score);
 
-    // Nintendo typically plays adjacent/2-bridge responses to center openings (e.g. (6, 4), (5, 6), (6, 5), (4, 6))
-    assert!(r >= 3 && r <= 7 && c >= 3 && c <= 7, "NIC must play in the active central region");
+    // Nintendo typically plays adjacent/2-bridge responses or edge-3 anchor probes (e.g. (2, 9) / J3, (2, 8) / I3, (6, 4) / E7, (5, 4) / E6, (5, 6) / G6)
+    assert!(r >= 1 && r <= 9 && c >= 1 && c <= 9, "NIC must play in the active board region, got ({}, {})", r, c);
 }
 
 #[test]

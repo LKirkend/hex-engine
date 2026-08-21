@@ -106,7 +106,7 @@ impl HexPatternMatcher {
         let opponent = if player == RED { BLUE } else { RED };
         if player == RED {
             if r == 0 { return true; }
-            if r > 4 { return false; }
+            if r > 2 { return false; }
             for tmpl in RED_NORTH_TEMPLATES {
                 if tmpl.dist as usize == r {
                     let mut valid = true;
@@ -127,7 +127,7 @@ impl HexPatternMatcher {
             }
         } else {
             if c == 0 { return true; }
-            if c > 4 { return false; }
+            if c > 2 { return false; }
             for tmpl in BLUE_WEST_TEMPLATES {
                 if tmpl.dist as usize == c {
                     let mut valid = true;
@@ -156,14 +156,14 @@ impl HexPatternMatcher {
     ///     if HexPatternMatcher::is_stone_connected_to_sink_edge(&board, 9, 3, RED) { ... }
     /// Description:
     ///     Checks if a stone is virtual-connected to the player's sink edge (South for Red, East for Blue)
-    ///     using precomputed Edge-2, Edge-3, Edge-4, and Edge-5 lookup tables.
+    ///     using precomputed Edge-2 and Edge-3 lookup tables.
     pub fn is_stone_connected_to_sink_edge(board: &HexBoard, r: usize, c: usize, player: u8) -> bool {
         let size = board.size;
         let opponent = if player == RED { BLUE } else { RED };
         if player == RED {
             if r == size - 1 { return true; }
             let dist_from_sink = size - 1 - r;
-            if dist_from_sink > 4 { return false; }
+            if dist_from_sink > 2 { return false; }
             for tmpl in RED_SOUTH_TEMPLATES {
                 if tmpl.dist as usize == dist_from_sink {
                     let mut valid = true;
@@ -185,7 +185,7 @@ impl HexPatternMatcher {
         } else {
             if c == size - 1 { return true; }
             let dist_from_sink = size - 1 - c;
-            if dist_from_sink > 4 { return false; }
+            if dist_from_sink > 2 { return false; }
             for tmpl in BLUE_EAST_TEMPLATES {
                 if tmpl.dist as usize == dist_from_sink {
                     let mut valid = true;
