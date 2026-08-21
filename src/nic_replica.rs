@@ -1,25 +1,37 @@
-//! ============================================================================
-//! Nintendo Impossible Computer (NIC) Replica Engine
-//!
-//! Description:
-//!     A high-fidelity algorithmic replica of Nintendo's Impossible Computer (NIC)
-//!     from Clubhouse Games: 51 Worldwide Classics.
-//!
-//! Architecture:
-//!     1. Anshelevich H-Search Virtual Connection (VC) Hypergraph Deduction.
-//!     2. Shannon Resistor Network Conductance Delta (ΔG) Gradient Evaluation.
-//!     3. Precomputed Edge Templates (Edge-2, Edge-3, Edge-4).
-//!     4. Greedy VC Wire Extension, Frontier Preemption, & Compulsory Carrier Defense.
-//!
-//! Author: Logan Kirkendall (Logan@LKAud.io)
-//! License: MIT
-//! ============================================================================
+// ============================================================================
+// Nintendo Impossible Computer (NIC) Replica Engine
+//
+// Description:
+//     A faithful algorithmic replica of Nintendo's Impossible Computer (NIC)
+//     from Clubhouse Games: 51 Worldwide Classics.
+//
+// Architecture:
+//     Pure 1-ply greedy conductance-maximizer. No minimax tree search.
+//     The real NIC is a casual-game AI that plays the move maximizing its own
+//     conductance improvement while minimizing the opponent's, evaluated
+//     instantaneously without lookahead.
+//
+//     1. Compulsory carrier defense (forced tactical reply).
+//     2. Immediate winning move detection.
+//     3. Must-block opponent's immediate win.
+//     4. For each legal move: compute delta_G_own and delta_G_opp via resistance network.
+//     5. Score = delta_G_own * 100 + delta_G_opp * 80 + small center bias.
+//     6. Play the highest-scoring move.
+//
+// Author: Logan Kirkendall (Logan@LKAud.io)
+// License: MIT
+// ============================================================================
 
-use crate::board::{HexBoard, BLUE, EMPTY, RED};
+use crate::board::{HexBoard, BLUE, RED};
 use crate::patterns::HexPatternMatcher;
 use crate::resistance::ResistanceEvaluator;
 
 /// Represents a candidate move evaluated by the NIC replica.
+///
+/// Usage:
+///     let ms = NicMoveScore { r: 5, c: 5, score: 150.0, delta_g_own: 0.8, delta_g_opp: 0.3 };
+/// Description:
+///     Captures the greedy conductance-delta scoring components for a single candidate move.
 #[derive(Debug, Clone, Copy)]
 pub struct NicMoveScore {
     pub r: usize,
@@ -27,16 +39,19 @@ pub struct NicMoveScore {
     pub score: f32,
     pub delta_g_own: f32,
     pub delta_g_opp: f32,
-    pub vc_bonus: f32,
 }
 
 /// Nintendo Impossible Computer (NIC) algorithmic replica engine.
 ///
-/// Implements pure Anshelevich Virtual Connection deduction, electrical conductance
-/// gradient search, edge template rails, and greedy VC tree growth.
-pub struct NicReplicaEngine {
-    pub max_depth: usize,
-}
+/// Implements pure 1-ply greedy conductance-maximization matching the real NIC's
+/// behavior: no minimax, no tree search, just the move with the best immediate
+/// resistance-network improvement. Compulsory carrier defense is the only
+/// "lookahead" — it's pattern-matched, not searched.
+///
+/// Usage:
+///     let mut nic = NicReplicaEngine::new();
+///     let (best_move, score) = nic.select_move(&board, RED);
+pub struct NicReplicaEngine;
 
 impl NicReplicaEngine {
     /// Usage:
@@ -44,19 +59,21 @@ impl NicReplicaEngine {
     /// Usage Example:
     ///     let nic = NicReplicaEngine::new();
     /// Description:
-    ///     Initializes a new NIC replica engine instance with default shallow VC search.
+    ///     Initializes a new NIC replica engine instance. No parameters needed
+    ///     since the NIC uses pure greedy evaluation with no depth parameter.
     pub fn new() -> Self {
-        Self { max_depth: 3 }
+        Self
     }
 
     /// Usage:
-    ///     let nic = NicReplicaEngine::with_depth(depth);
+    ///     let nic = NicReplicaEngine::with_depth(_depth);
     /// Usage Example:
-    ///     let nic = NicReplicaEngine::with_depth(4);
+    ///     let nic = NicReplicaEngine::with_depth(3); // depth ignored
     /// Description:
-    ///     Initializes a new NIC replica engine instance with a specific search depth.
-    pub fn with_depth(depth: usize) -> Self {
-        Self { max_depth: depth }
+    ///     Backward-compatible constructor. Depth parameter is ignored since the
+    ///     real NIC is purely greedy (no tree search).
+    pub fn with_depth(_depth: usize) -> Self {
+        Self
     }
 
     /// Usage:
@@ -65,19 +82,22 @@ impl NicReplicaEngine {
     ///     let mut nic = NicReplicaEngine::new();
     ///     let (bm, score) = nic.select_move(&board, RED);
     /// Description:
-    ///     Selects the optimal move according to Nintendo's Anshelevich VC deduction
-    ///     and Shannon conductance gradient algorithm.
+    ///     Selects the optimal move using pure greedy conductance-delta evaluation.
+    ///     Matches the real NIC's decision process:
+    ///     1. Compulsory carrier defense (instant forced reply)
+    ///     2. Immediate win detection
+    ///     3. Must-block opponent win
+    ///     4. Greedy ΔG maximization for all remaining legal moves
     pub fn select_move(&mut self, board: &HexBoard, player: u8) -> (Option<(usize, usize)>, f32) {
         if board.is_game_over() {
             return (None, 0.0);
         }
 
-        // 1. Compulsory Carrier Response ($O(1)$ immediate tactical reply)
+        // 1. Compulsory Carrier Response (instant pattern-matched tactical reply)
         if let Some(compulsory) = HexPatternMatcher::get_compulsory_carrier_response(board, player) {
             return (Some(compulsory), 1000.0);
         }
 
-        // 2. Immediate Winning Move Detection (0-cost virtual wire completion)
         let legal_moves = board.get_legal_moves();
         if legal_moves.is_empty() {
             return (None, 0.0);
@@ -88,60 +108,58 @@ impl NicReplicaEngine {
 
         let opponent = if player == RED { BLUE } else { RED };
 
-        // 3. Evaluate Conductance Gradient & VC Bonuses for all Legal Moves
-        let mut scored_moves: Vec<NicMoveScore> = Vec::with_capacity(legal_moves.len());
+        // 2. Immediate Winning Move Detection
+        for &(r, c) in &legal_moves {
+            let mut clone = board.clone();
+            clone.place_move(r, c, player);
+            if clone.get_winner() == player {
+                return (Some((r, c)), 10000.0);
+            }
+        }
 
+        // 3. Must-Block Opponent's Immediate Win
+        for &(r, c) in &legal_moves {
+            let mut clone = board.clone();
+            clone.place_move(r, c, opponent);
+            if clone.get_winner() == opponent {
+                return (Some((r, c)), 9000.0);
+            }
+        }
+
+        // 4. Pure Greedy Conductance-Delta Evaluation for All Legal Moves
         let base_r_own = ResistanceEvaluator::compute_player_resistance(board, player).max(0.001);
         let base_r_opp = ResistanceEvaluator::compute_player_resistance(board, opponent).max(0.001);
         let base_g_own = 1.0 / base_r_own;
         let base_g_opp = 1.0 / base_r_opp;
 
+        let size = board.size;
+        let center = (size - 1) as f32 / 2.0;
+
+        let mut scored_moves: Vec<NicMoveScore> = Vec::with_capacity(legal_moves.len());
+
         for &(r, c) in &legal_moves {
             let mut clone = board.clone();
             clone.place_move(r, c, player);
 
-            // Immediate win check
-            if clone.get_winner() == player {
-                return (Some((r, c)), 10000.0);
-            }
-
-            // Resistance change after move
+            // Conductance after placing our stone
             let after_r_own = ResistanceEvaluator::compute_player_resistance(&clone, player).max(0.001);
             let after_r_opp = ResistanceEvaluator::compute_player_resistance(&clone, opponent).max(0.001);
             let after_g_own = 1.0 / after_r_own;
             let after_g_opp = 1.0 / after_r_opp;
 
+            // ΔG: how much our conductance improved, how much opponent's dropped
             let delta_g_own = (after_g_own - base_g_own).max(0.0);
             let delta_g_opp = (base_g_opp - after_g_opp).max(0.0);
 
-            // Anshelevich VC bonuses
-            let vc_bonus = HexPatternMatcher::evaluate_pattern_bonus(board, r, c, player);
+            // Small center bias (NIC slightly prefers central moves, all else equal)
+            let dr = r as f32 - center;
+            let dc = c as f32 - center;
+            let center_bias = (center - (dr * dr + dc * dc).sqrt()) * 0.5;
 
-            // Distance improvement
-            let my_dist = crate::evaluator::HexEvaluator::shortest_path(board, player);
-            let my_dist_after = crate::evaluator::HexEvaluator::shortest_path(&clone, player);
-            let dist_bonus = if my_dist_after < my_dist {
-                (my_dist - my_dist_after) as f32 * 60.0
-            } else {
-                0.0
-            };
-
-            // Opponent shortest-path disruption
-            let opp_dist = crate::evaluator::HexEvaluator::shortest_path(board, opponent);
-            let opp_dist_after = crate::evaluator::HexEvaluator::shortest_path(&clone, opponent);
-            let opp_dist_penalty = if opp_dist_after > opp_dist {
-                (opp_dist_after - opp_dist) as f32 * 75.0
-            } else {
-                0.0
-            };
-
-            // Composite NIC scoring formula:
-            // Score = 120 * ΔG_own + 90 * ΔG_opp + VC_bonus + Path_deltas
-            let total_score = delta_g_own * 120.0
-                + delta_g_opp * 90.0
-                + vc_bonus
-                + dist_bonus
-                + opp_dist_penalty;
+            // NIC composite score: pure conductance deltas + tiny center tiebreaker
+            let total_score = delta_g_own * 100.0
+                + delta_g_opp * 80.0
+                + center_bias;
 
             scored_moves.push(NicMoveScore {
                 r,
@@ -149,108 +167,13 @@ impl NicReplicaEngine {
                 score: total_score,
                 delta_g_own,
                 delta_g_opp,
-                vc_bonus,
             });
         }
 
-        // Sort descending by score
+        // Sort descending by score, play the best
         scored_moves.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
 
-        // 4. Shallow Minimax Verification over Top-5 Candidate Moves
-        if self.max_depth <= 1 || scored_moves.len() <= 1 {
-            let best = scored_moves[0];
-            return (Some((best.r, best.c)), best.score);
-        }
-
-        let mut best_move = (scored_moves[0].r, scored_moves[0].c);
-        let mut best_eval = -100000.0f32;
-
-        let candidate_count = 6.min(scored_moves.len());
-        for i in 0..candidate_count {
-            let cand = scored_moves[i];
-            let mut clone = board.clone();
-            clone.place_move(cand.r, cand.c, player);
-
-            let eval = -self.shallow_search(&clone, opponent, self.max_depth - 1, -100000.0, 100000.0);
-            if eval > best_eval {
-                best_eval = eval;
-                best_move = (cand.r, cand.c);
-            }
-        }
-
-        (Some(best_move), best_eval)
-    }
-
-    /// Usage:
-    ///     let eval = nic.shallow_search(board, player, depth, alpha, beta);
-    /// Description:
-    ///     Performs a shallow minimax tree search using pure Anshelevich VC evaluation.
-    fn shallow_search(&mut self, board: &HexBoard, player: u8, depth: usize, mut alpha: f32, beta: f32) -> f32 {
-        let winner = board.get_winner();
-        if winner == player {
-            return 10000.0;
-        } else if winner != EMPTY {
-            return -10000.0;
-        }
-
-        if depth == 0 {
-            return self.evaluate_leaf(board, player);
-        }
-
-        let legal_moves = board.get_legal_moves();
-        if legal_moves.is_empty() {
-            return 0.0;
-        }
-
-        let opponent = if player == RED { BLUE } else { RED };
-
-        // Quick compulsory reply
-        if let Some((cr, cc)) = HexPatternMatcher::get_compulsory_carrier_response(board, player) {
-            let mut clone = board.clone();
-            clone.place_move(cr, cc, player);
-            return -self.shallow_search(&clone, opponent, depth - 1, -beta, -alpha);
-        }
-
-        // Rank top moves for shallow expansion
-        let mut moves: Vec<((usize, usize), f32)> = Vec::with_capacity(legal_moves.len());
-        for &(r, c) in &legal_moves {
-            let pat = HexPatternMatcher::evaluate_pattern_bonus(board, r, c, player);
-            moves.push(((r, c), pat));
-        }
-        moves.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-
-        let explore_count = 4.min(moves.len());
-        for i in 0..explore_count {
-            let ((r, c), _) = moves[i];
-            let mut clone = board.clone();
-            clone.place_move(r, c, player);
-
-            let score = -self.shallow_search(&clone, opponent, depth - 1, -beta, -alpha);
-            if score >= beta {
-                return beta;
-            }
-            if score > alpha {
-                alpha = score;
-            }
-        }
-
-        alpha
-    }
-
-    /// Usage:
-    ///     let score = nic.evaluate_leaf(board, player);
-    /// Description:
-    ///     Leaf evaluation combining conductance and shortest path distances.
-    fn evaluate_leaf(&self, board: &HexBoard, player: u8) -> f32 {
-        let opponent = if player == RED { BLUE } else { RED };
-        let r_own = ResistanceEvaluator::compute_player_resistance(board, player).max(0.001);
-        let r_opp = ResistanceEvaluator::compute_player_resistance(board, opponent).max(0.001);
-        let g_own = 1.0 / r_own;
-        let g_opp = 1.0 / r_opp;
-
-        let d_own = crate::evaluator::HexEvaluator::shortest_path(board, player) as f32;
-        let d_opp = crate::evaluator::HexEvaluator::shortest_path(board, opponent) as f32;
-
-        (g_own - g_opp) * 80.0 + (d_opp - d_own) * 45.0
+        let best = scored_moves[0];
+        (Some((best.r, best.c)), best.score)
     }
 }
