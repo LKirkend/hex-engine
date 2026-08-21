@@ -322,10 +322,12 @@ impl ResistanceEvaluator {
 
                 // 2. Precomputed edge template connections to Source and Sink rails
                 if crate::patterns::HexPatternMatcher::is_stone_connected_to_source_edge(board, r, c, player) {
-                    source_template_g[idx] = 80.0;
+                    let d = if player == RED { r } else { c };
+                    source_template_g[idx] = if d == 1 { 35.0 } else { 18.0 };
                 }
                 if crate::patterns::HexPatternMatcher::is_stone_connected_to_sink_edge(board, r, c, player) {
-                    sink_template_g[idx] = 80.0;
+                    let d = if player == RED { size - 1 - r } else { size - 1 - c };
+                    sink_template_g[idx] = if d == 1 { 35.0 } else { 18.0 };
                 }
             }
         }
