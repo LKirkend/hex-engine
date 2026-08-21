@@ -427,20 +427,35 @@ impl HexEvaluator {
         //    25% heuristic (tactical features, center control)
         let mut score = resistance_score * 0.75 + heuristic_score * 0.25;
 
-        // 4. Bridge-Chain Threat Detection: penalize if opponent has a long
-        //    bridge-connected chain spanning most of the board axis
+        // 4. Bridge-Chain Threat Detection: penalize exponentially if opponent has a bridge chain
         let opponent = if player == RED { BLUE } else { RED };
         let (opp_reach, opp_chain_size) = Self::bridge_chain_reach(board, opponent);
         if opp_reach >= 0.35 {
-            let threat = (opp_reach - 0.3) * 550.0 + (opp_chain_size as f32) * 12.0;
-            score -= threat;
+            let base_threat = if opp_reach >= 0.80 {
+                2500.0 + (opp_reach - 0.80) * 4000.0
+            } else if opp_reach >= 0.60 {
+                900.0 + (opp_reach - 0.60) * 3500.0
+            } else if opp_reach >= 0.45 {
+                350.0 + (opp_reach - 0.45) * 2500.0
+            } else {
+                (opp_reach - 0.30) * 1500.0
+            };
+            score -= base_threat + (opp_chain_size as f32) * 25.0;
         }
 
         // 5. Bonus if our own chain is extensive
         let (my_reach, my_chain_size) = Self::bridge_chain_reach(board, player);
         if my_reach >= 0.35 {
-            let bonus = (my_reach - 0.3) * 350.0 + (my_chain_size as f32) * 8.0;
-            score += bonus;
+            let base_bonus = if my_reach >= 0.80 {
+                1800.0 + (my_reach - 0.80) * 3000.0
+            } else if my_reach >= 0.60 {
+                700.0 + (my_reach - 0.60) * 2500.0
+            } else if my_reach >= 0.45 {
+                250.0 + (my_reach - 0.45) * 1800.0
+            } else {
+                (my_reach - 0.30) * 1000.0
+            };
+            score += base_bonus + (my_chain_size as f32) * 18.0;
         }
 
         score
@@ -467,11 +482,29 @@ impl HexEvaluator {
         let opponent = if player == RED { BLUE } else { RED };
         let (opp_reach, opp_chain_size) = Self::bridge_chain_reach(board, opponent);
         if opp_reach >= 0.35 {
-            score -= (opp_reach - 0.3) * 450.0 + (opp_chain_size as f32) * 10.0;
+            let base_threat = if opp_reach >= 0.80 {
+                2500.0 + (opp_reach - 0.80) * 4000.0
+            } else if opp_reach >= 0.60 {
+                900.0 + (opp_reach - 0.60) * 3500.0
+            } else if opp_reach >= 0.45 {
+                350.0 + (opp_reach - 0.45) * 2500.0
+            } else {
+                (opp_reach - 0.30) * 1500.0
+            };
+            score -= base_threat + (opp_chain_size as f32) * 25.0;
         }
         let (my_reach, my_chain_size) = Self::bridge_chain_reach(board, player);
         if my_reach >= 0.35 {
-            score += (my_reach - 0.3) * 280.0 + (my_chain_size as f32) * 6.0;
+            let base_bonus = if my_reach >= 0.80 {
+                1800.0 + (my_reach - 0.80) * 3000.0
+            } else if my_reach >= 0.60 {
+                700.0 + (my_reach - 0.60) * 2500.0
+            } else if my_reach >= 0.45 {
+                250.0 + (my_reach - 0.45) * 1800.0
+            } else {
+                (my_reach - 0.30) * 1000.0
+            };
+            score += base_bonus + (my_chain_size as f32) * 18.0;
         }
 
         score
