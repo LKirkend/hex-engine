@@ -241,6 +241,24 @@ public:
 
     /**
      * Usage:
+     *     auto tok = panel.get_token_layout(node_id);
+     * Usage Example:
+     *     if (auto tok = analysis_panel.get_token_layout(4)) { ... }
+     * Description:
+     *     Returns layout rectangle and token properties for the specified node ID if rendered.
+     */
+    std::optional<MoveTokenLayout> get_token_layout(int node_id) const {
+        if (is_collapsed) return std::nullopt;
+        for (const auto& tok : rendered_move_tokens) {
+            if (tok.node_id == node_id) {
+                return tok;
+            }
+        }
+        return std::nullopt;
+    }
+
+    /**
+     * Usage:
      *     panel.draw_eval_bar(ren, x, y, width, height, score);
      * Usage Example:
      *     panel.draw_eval_bar(ren, 20.0f, 70.0f, 28.0f, 480.0f, 12.5f);

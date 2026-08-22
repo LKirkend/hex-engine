@@ -34,6 +34,7 @@ struct MoveNode {
     int depth = 0;
     double elapsed_sec = 0.0;
     float eval_score = 0.0f;
+    std::string comment = "";
     std::vector<int> children;
     bool is_deleted = false;
 
@@ -599,13 +600,20 @@ public:
 
 private:
     static std::string format_node_metadata(const MoveNode& node) {
-        if (node.depth <= 0 && node.elapsed_sec <= 0.0 && node.eval_score == 0.0f) {
+        bool has_meta = (node.depth > 0 || node.elapsed_sec > 0.0 || node.eval_score != 0.0f);
+        bool has_comment = !node.comment.empty();
+        if (!has_meta && !has_comment) {
             return "";
         }
         std::stringstream ss;
         ss << "{";
         bool first = true;
+        if (!node.comment.empty()) {
+            ss << node.comment;
+            first = false;
+        }
         if (node.depth > 0) {
+            if (!first) ss << " ";
             ss << "[%depth " << node.depth << "]";
             first = false;
         }

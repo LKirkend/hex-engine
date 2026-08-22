@@ -165,6 +165,7 @@ pub extern "C" fn hex_engine_search(
     }
 
     let p = player as u8;
+    board.set_current_player(p);
     let cancel_flag = if !cancel_flag_ptr.is_null() {
         Some(unsafe { &*cancel_flag_ptr })
     } else {
@@ -354,6 +355,7 @@ pub extern "C" fn hex_engine_search_step_streaming(
     }
 
     let p = player as u8;
+    board.set_current_player(p);
     let cancel_flag = if !cancel_flag_ptr.is_null() {
         Some(unsafe { &*cancel_flag_ptr })
     } else {
@@ -587,7 +589,9 @@ pub extern "C" fn hex_engine_get_initial_candidates(
         }
     }
 
-    let top_moves = engine.get_initial_candidates(&board, player as u8, max_top as usize);
+    let p = player as u8;
+    board.set_current_player(p);
+    let top_moves = engine.get_initial_candidates(&board, p, max_top as usize);
     let count = top_moves.len().min(max_top as usize);
     let out_slice = unsafe { std::slice::from_raw_parts_mut(out_top_moves, count) };
 

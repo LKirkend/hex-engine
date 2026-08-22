@@ -82,6 +82,20 @@ impl HexBoard {
     }
 
     /// Usage:
+    ///     board.set_current_player(RED);
+    /// Usage Example:
+    ///     board.set_current_player(player);
+    /// Description:
+    ///     Sets active player turn and updates Zobrist hash if different from current turn.
+    #[inline(always)]
+    pub fn set_current_player(&mut self, player: u8) {
+        if self.current_player != player {
+            self.zobrist_hash ^= ZOBRIST_PLAYER[self.current_player as usize] ^ ZOBRIST_PLAYER[player as usize];
+            self.current_player = player;
+        }
+    }
+
+    /// Usage:
     ///     let cell_val = board.get_cell(r, c);
     /// Usage Example:
     ///     if board.get_cell(5, 5) == EMPTY { ... }

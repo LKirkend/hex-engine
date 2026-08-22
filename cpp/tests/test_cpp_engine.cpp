@@ -662,13 +662,15 @@ void test_cpp_context_menu_and_primary_branch() {
     hex::gui::ContextMenu menu;
     menu.open(100.0f, 200.0f, n3, tree.has_following_nodes(n3));
     assert(menu.is_visible);
-    assert(menu.items.size() == 2);
+    assert(menu.items.size() == 3);
     assert(menu.items[0].label == "Delete Branch"); // Because n3 has children!
     assert(menu.items[1].label == "Make Primary Branch");
+    assert(menu.items[2].label == "Add Comment");
 
     hex::gui::ContextMenu menu_leaf;
     menu_leaf.open(100.0f, 200.0f, n4, tree.has_following_nodes(n4));
     assert(menu_leaf.items[0].label == "Delete"); // Leaf node!
+    assert(menu_leaf.items[2].label == "Add Comment");
 
     // 3. Test Make Primary Branch promotion
     bool p_ok = tree.make_primary_branch(n3);
@@ -676,7 +678,12 @@ void test_cpp_context_menu_and_primary_branch() {
     assert(tree.nodes[n1].children[0] == n3); // n3 is now promoted to primary!
     assert(tree.nodes[n1].children[1] == n2); // n2 demoted to secondary
 
-    std::cout << "[PASS] C++ ContextMenu dropdown popup and Make Primary Branch promotion\n";
+    // 4. Test MoveNode commentary
+    tree.nodes[n3].comment = "Strategic carrier defense";
+    std::string pgn_out = tree.to_pgn_string(11, hex::RED);
+    assert(pgn_out.find("Strategic carrier defense") != std::string::npos);
+
+    std::cout << "[PASS] C++ ContextMenu dropdown popup with Add Comment and Make Primary Branch promotion\n";
 }
 
 /**
@@ -708,22 +715,28 @@ void test_cpp_instant_candidate_switch_and_cache_navigation() {
     }
     assert(has_f6);
 
-    // 2. Play move and verify immediate child candidate generation
+    // 2. Play moves and verify immediate child candidate generation
     board.place_move(5, 5, hex::BLUE); // 1. f6
-    auto reply_candidates = engine.get_initial_candidates(board, hex::RED, 12);
+    board.place_move(5, 4, hex::RED);  // 1... e6
+    board.place_move(4, 6, hex::BLUE); // 2. g5
+    board.place_move(7, 3, hex::RED);  // 2... d8
+    auto reply_candidates = engine.get_initial_candidates(board, hex::BLUE, 12);
     assert(!reply_candidates.empty());
     assert(reply_candidates.size() >= 10);
-    // Verified that reply candidates do not include already occupied cell (5,5)
+    // Verified that reply candidates do not include already occupied cells
     for (const auto& tm : reply_candidates) {
         assert(!(tm.r == 5 && tm.c == 5));
+        assert(!(tm.r == 5 && tm.c == 4));
+        assert(!(tm.r == 4 && tm.c == 6));
+        assert(!(tm.r == 7 && tm.c == 3));
     }
 
-    // 3. Search child position to populate TT and cache
-    auto search_res = engine.search(board, hex::RED, 4);
+    // 3. Search child position beyond opening book (total_stones = 4) to populate TT and cache
+    auto search_res = engine.search(board, hex::BLUE, 4);
     assert(!search_res.top_moves.empty());
 
     // 4. Query initial candidates again - should now have authentic TT scores and depths!
-    auto cached_initial = engine.get_initial_candidates(board, hex::RED, 12);
+    auto cached_initial = engine.get_initial_candidates(board, hex::BLUE, 12);
     assert(!cached_initial.empty());
     // At least the top move should have depth >= 1 from TT
     assert(cached_initial[0].depth >= 1);

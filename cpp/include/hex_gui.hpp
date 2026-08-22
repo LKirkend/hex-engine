@@ -39,6 +39,17 @@ public:
     ContextMenu context_menu;
     TopBarRenderer top_bar;
 
+    struct CommentEditorState {
+        bool is_active = false;
+        int target_node_id = -1;
+        std::string text = "";
+        float x = 0.0f;
+        float y = 0.0f;
+        float w = 220.0f;
+        float h = 24.0f;
+    };
+    CommentEditorState comment_editor;
+
     EngineUIStats ui_stats;
     std::mutex stats_mutex;
     std::thread search_thread;
@@ -360,6 +371,12 @@ private:
             } else if (ev.type == SDL_EVENT_MOUSE_MOTION && !size_modal.is_visible) {
                 hover_cell = board_renderer.pixel_to_hex(ev.motion.x, ev.motion.y, board.size);
                 selected_candidate = analysis_panel.get_hovered_candidate(ev.motion.x, ev.motion.y, static_cast<float>(w), ui_stats.top_moves);
+            } else if (ev.type == SDL_EVENT_TEXT_INPUT) {
+                if (comment_editor.is_active) {
+                    if (comment_editor.text.size() < 64) {
+                        comment_editor.text += ev.text.text;
+                    }
+                }
             } else if (ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
                 if (ev.button.button == SDL_BUTTON_LEFT) {
                     handle_mouse_click(ev.button.x, ev.button.y, static_cast<float>(w), static_cast<float>(h));
@@ -369,6 +386,29 @@ private:
             } else if (ev.type == SDL_EVENT_KEY_DOWN) {
                 handle_key_event(ev);
             }
+        }
+    }
+
+    void open_comment_editor(int target_id) {
+        if (target_id < 0 || target_id >= static_cast<int>(move_tree.nodes.size())) return;
+        comment_editor.is_active = true;
+        comment_editor.target_node_id = target_id;
+        comment_editor.text = move_tree.nodes[target_id].comment;
+
+        int w = 1120, h = 750;
+        SDL_GetWindowSize(window, &w, &h);
+        float px = static_cast<float>(w) - analysis_panel.panel_width;
+
+        if (auto tok = analysis_panel.get_token_layout(target_id)) {
+            comment_editor.x = tok->x + tok->w + 6.0f;
+            comment_editor.y = tok->y - 2.0f;
+            if (comment_editor.x + comment_editor.w > static_cast<float>(w) - 10.0f) {
+                comment_editor.x = std::max(px + 16.0f, tok->x);
+                comment_editor.y = tok->y + tok->h + 4.0f;
+            }
+        } else {
+            comment_editor.x = px + 16.0f;
+            comment_editor.y = 350.0f;
         }
     }
 
@@ -392,7 +432,21 @@ private:
             } else if (act == 2) {
                 make_primary_branch(target_id);
                 return;
+            } else if (act == 3) {
+                open_comment_editor(target_id);
+                return;
             }
+        }
+
+        if (comment_editor.is_active) {
+            if (mx >= comment_editor.x && mx <= comment_editor.x + comment_editor.w &&
+                my >= comment_editor.y && my <= comment_editor.y + comment_editor.h) {
+                return;
+            }
+            if (comment_editor.target_node_id >= 0 && comment_editor.target_node_id < static_cast<int>(move_tree.nodes.size())) {
+                move_tree.nodes[comment_editor.target_node_id].comment = comment_editor.text;
+            }
+            comment_editor.is_active = false;
         }
 
         if (size_modal.is_visible) {
@@ -457,6 +511,26 @@ private:
 
 
     void handle_key_event(const SDL_Event& ev) {
+        if (comment_editor.is_active) {
+            if (ev.key.key == SDLK_RETURN || ev.key.key == SDLK_KP_ENTER) {
+                if (comment_editor.target_node_id >= 0 && comment_editor.target_node_id < static_cast<int>(move_tree.nodes.size())) {
+                    move_tree.nodes[comment_editor.target_node_id].comment = comment_editor.text;
+                    show_toast("Comment saved!");
+                }
+                comment_editor.is_active = false;
+                return;
+            } else if (ev.key.key == SDLK_ESCAPE) {
+                comment_editor.is_active = false;
+                return;
+            } else if (ev.key.key == SDLK_BACKSPACE) {
+                if (!comment_editor.text.empty()) {
+                    comment_editor.text.pop_back();
+                }
+                return;
+            }
+            return;
+        }
+
         if (ev.key.key == SDLK_ESCAPE) {
             if (context_menu.is_visible) { context_menu.close(); return; }
             if (size_modal.is_visible) { size_modal.close(); return; }
@@ -797,8 +871,34 @@ private:
         }
 
         size_modal.render(renderer, static_cast<float>(w), static_cast<float>(h));
+        render_comment_editor(renderer);
         context_menu.render(renderer, mx, my);
         SDL_RenderPresent(renderer);
+    }
+
+    void render_comment_editor(SDL_Renderer* ren) const {
+        if (!comment_editor.is_active) return;
+        // Outer dark panel
+        SDL_FRect box{comment_editor.x, comment_editor.y, comment_editor.w, comment_editor.h};
+        SDL_SetRenderDrawColor(ren, 20, 25, 35, 250);
+        SDL_RenderFillRect(ren, &box);
+
+        // Border: Cyan
+        SDL_SetRenderDrawColor(ren, 80, 190, 255, 255);
+        SDL_RenderRect(ren, &box);
+
+        // Text with blinking cursor
+        std::string disp_text = comment_editor.text;
+        uint64_t ticks = SDL_GetTicks();
+        if ((ticks / 500) % 2 == 0) {
+            disp_text += "|";
+        }
+        SDL_SetRenderDrawColor(ren, 255, 255, 255, 255);
+        SDL_RenderDebugText(ren, comment_editor.x + 5.0f, comment_editor.y + 5.0f, disp_text.c_str());
+
+        // Helper hint underneath
+        SDL_SetRenderDrawColor(ren, 140, 155, 175, 255);
+        SDL_RenderDebugText(ren, comment_editor.x, comment_editor.y + comment_editor.h + 2.0f, "[Enter: Save | Esc: Cancel]");
     }
 };
 

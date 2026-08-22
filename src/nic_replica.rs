@@ -98,6 +98,12 @@ impl NicReplicaEngine {
             return (Some(compulsory), 1000.0);
         }
 
+        let total_stones = (board.red_bb.count_ones() + board.blue_bb.count_ones()) as usize;
+        if total_stones == 0 {
+            let center_idx = (board.size - 1) / 2;
+            return (Some((center_idx, center_idx)), 100.0);
+        }
+
         let legal_moves = board.get_legal_moves();
         if legal_moves.is_empty() {
             return (None, 0.0);
@@ -151,11 +157,13 @@ impl NicReplicaEngine {
             let delta_g_own = (after_g_own - base_g_own).max(0.0);
             let delta_g_opp = (base_g_opp - after_g_opp).max(0.0);
 
-            // 5. Tactical weights: 2-bridge formation & opponent contact
+            // 5. Tactical weights: 2-bridge formation, opponent contact, leap denial
             let ur = r as isize;
             let uc = c as isize;
             let mut bridge_count = 0;
             let mut opp_contact_count = 0;
+            let mut opp_leap_preempt = 0;
+            let mut opp_carrier_interception = 0;
 
             for k in 0..6 {
                 // Check 2-bridge to friendly stones
@@ -188,9 +196,48 @@ impl NicReplicaEngine {
                         opp_contact_count += 1;
                     }
                 }
+
+                // Check opponent 2-bridge leap preemption
+                let opp_r = ur - br;
+                let opp_c = uc - bc;
+                if opp_r >= 0 && opp_r < size as isize && opp_c >= 0 && opp_c < size as isize {
+                    if board.get_cell(opp_r as usize, opp_c as usize) == opponent {
+                        let c1_r = opp_r + c1r;
+                        let c1_c = opp_c + c1c;
+                        let c2_r = opp_r + c2r;
+                        let c2_c = opp_c + c2c;
+                        if c1_r >= 0 && c1_r < size as isize && c1_c >= 0 && c1_c < size as isize
+                            && c2_r >= 0 && c2_r < size as isize && c2_c >= 0 && c2_c < size as isize
+                        {
+                            if board.get_cell(c1_r as usize, c1_c as usize) == crate::board::EMPTY
+                                && board.get_cell(c2_r as usize, c2_c as usize) == crate::board::EMPTY
+                            {
+                                opp_leap_preempt += 1;
+                            }
+                        }
+                    }
+                }
+
+                // Check if this move is a carrier between two opponent stones
+                let st_a_r = ur - c1r;
+                let st_a_c = uc - c1c;
+                let st_b_r = st_a_r + br;
+                let st_b_c = st_a_c + bc;
+                if st_a_r >= 0 && st_a_r < size as isize && st_a_c >= 0 && st_a_c < size as isize
+                    && st_b_r >= 0 && st_b_r < size as isize && st_b_c >= 0 && st_b_c < size as isize
+                {
+                    if board.get_cell(st_a_r as usize, st_a_c as usize) == opponent
+                        && board.get_cell(st_b_r as usize, st_b_c as usize) == opponent
+                    {
+                        opp_carrier_interception += 1;
+                    }
+                }
             }
 
-            let tactical_score = bridge_count as f32 * 40.0 + opp_contact_count as f32 * 30.0;
+            let tactical_score = bridge_count as f32 * 40.0
+                + opp_contact_count as f32 * 30.0
+                + opp_leap_preempt as f32 * 45.0
+                + opp_carrier_interception as f32 * 40.0;
 
             // Center bias (NIC prioritizes central contest, especially in opening/early middle game)
             let center_bias = if size == 11 {

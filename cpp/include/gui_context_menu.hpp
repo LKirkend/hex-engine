@@ -59,6 +59,7 @@ public:
         std::string del_label = has_children ? "Delete Branch" : "Delete";
         items.push_back({1, del_label});
         items.push_back({2, "Make Primary Branch"});
+        items.push_back({3, "Add Comment"});
 
         // Clamp inside window boundaries
         float menu_h = static_cast<float>(items.size()) * item_height + 8.0f;
@@ -144,11 +145,13 @@ public:
                 SDL_RenderFillRect(ren, &item_rect);
             }
 
-            // Colors: Red for Delete, Gold for Make Primary Branch
+            // Colors: Red for Delete, Gold for Make Primary Branch, Cyan for Add Comment
             if (item.id == 1) {
                 SDL_SetRenderDrawColor(ren, 235, 90, 90, 255);
-            } else {
+            } else if (item.id == 2) {
                 SDL_SetRenderDrawColor(ren, 255, 220, 100, 255);
+            } else {
+                SDL_SetRenderDrawColor(ren, 100, 210, 255, 255);
             }
 
             SDL_RenderDebugText(ren, x + 10.0f, cur_y + 8.0f, item.label.c_str());
